@@ -1,32 +1,2003 @@
-<!DOCTYPE html>
-<html lang="ja" prefix="og: http://ogp.me/ns#">
-<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta name="viewport" content="width=device-width">
-    <meta name="format-detection" content="telephone=no">
-    <meta name="msvalidate.01" content="B8CF3AB611454D05429AEFA59A12D113">
-    <!--[if IE]>
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <![endif]-->
-    <!--[if lt IE 9]>
-        <script src="https://cdn.jsdelivr.net/html5shiv/3.7.2/html5shiv.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/respond.js/1.4.2/respond.min.js"></script>
-    <![endif]-->
-    <title>360°VIEW</title>
-    <link rel="stylesheet" href="../view360.css" type="text/css" media="all">
-    <script type='text/javascript' src='https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js'></script>
-    <script type="text/javascript" src="./view360.js"></script>
-    <style>
-        body {
-            text-align: center;
-        }
-        img {
-            max-width: 100%;
-            height: auto;
-        }
-    </style>
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="BEV・HEV・PHEVの代表的な内部構造を3Dで再現し、XYZ各軸を両端から切った断面と、部品ごとの役割・代表メーカーを見られるビューアー。">
+<title>電動車アナトミーCT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: radiology reading-room workstation. The scan viewport fills the left, the instrument column sits on the right; on phones the column drops below the viewport. Single dark look by choice (CT reading rooms are dark). */
+:root{
+  --bg:#0a0f12;
+  --well:#05080a;
+  --panel:#0e1519;
+  --raise:#131c21;
+  --line:#1f2c34;
+  --line-2:#2b3c46;
+  --ink:#dbe5e7;
+  --ink-2:#98aab0;
+  --ink-3:#64777e;
+  --accent:#f2b84b;
+  --accent-2:#a77c2c;
+  --on-accent:#1a1204;
+  --ax-x:#ff6f61;
+  --ax-y:#5dd28b;
+  --ax-z:#5ea8ff;
+  --f-ui:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"Zen Kaku Gothic New",monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0}
+[hidden]{display:none!important}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px;box-sizing:border-box}
+
+/* ---------- viewport ---------- */
+.stage{position:relative;min-width:0;min-height:0;background:var(--well);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+.hud{position:absolute;font-family:var(--f-mono);font-size:11px;line-height:1.55;color:var(--ink-2);pointer-events:none;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.hud b{color:var(--accent);font-weight:600}
+.hud .k{color:var(--ink-3)}
+.hud-tl{left:14px;top:12px}
+.hud-tl .big{font-size:13px;color:var(--ink)}
+.hud-tr{right:14px;top:12px;text-align:right}
+.hud-tr .row{display:flex;gap:8px;justify-content:flex-end}
+.hud-tr i{font-style:normal;font-weight:600}
+.hud-br{right:14px;bottom:12px;display:flex;align-items:flex-end;gap:10px}
+.hud-br .mode{text-align:right}
+#gizmo{width:84px;height:84px;display:block}
+.views{position:absolute;left:50%;top:12px;transform:translateX(-50%);display:flex;gap:2px;padding:3px;background:color-mix(in srgb,var(--panel) 86%,transparent);border:1px solid var(--line);border-radius:6px}
+.views button{background:none;border:0;border-radius:4px;padding:3px 9px;font-size:12px;color:var(--ink-2)}
+.views button:hover{background:var(--raise);color:var(--ink)}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line-2);border-radius:4px;padding:3px 8px;font-size:12px;white-space:nowrap;transform:translate(14px,14px);box-shadow:0 4px 16px rgb(0 0 0 / .4)}
+.tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:0}
+.tip small{font-family:var(--f-mono);color:var(--ink-3);margin-left:6px;font-size:10.5px}
+.loading{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--f-mono);font-size:12px;color:var(--ink-3);background:var(--well)}
+.hint{position:absolute;left:14px;bottom:12px;font-size:11.5px;color:var(--ink-3);pointer-events:none;max-width:46%}
+
+/* ---------- info card ---------- */
+.card{position:absolute;left:12px;bottom:12px;width:min(380px,calc(100% - 24px));max-height:calc(100% - 70px);overflow:auto;background:color-mix(in srgb,var(--panel) 95%,transparent);border:1px solid var(--line-2);border-radius:8px;padding:14px 16px 14px;box-shadow:0 10px 40px rgb(0 0 0 / .5);box-sizing:border-box}
+.card-top{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.chip-sys{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-2);border:1px solid var(--line-2);border-radius:999px;padding:1px 9px}
+.chip-sys i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.card .x{background:none;border:1px solid transparent;border-radius:4px;width:28px;height:28px;color:var(--ink-2);font-size:18px;line-height:1}
+.card .x:hover{border-color:var(--line-2);color:var(--ink)}
+.card h3{margin:8px 0 0;font-size:20px;font-weight:700;line-height:1.35;text-wrap:balance}
+.card .en{margin:0;font-family:var(--f-mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.03em}
+.types{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+.types span{font-family:var(--f-mono);font-size:10.5px;padding:0 6px;border-radius:3px;border:1px solid var(--line-2);color:var(--ink-3)}
+.types span.on{border-color:var(--accent-2);color:var(--accent)}
+.card dl{margin:10px 0 0;display:grid;gap:8px}
+.card dt{font-size:11px;letter-spacing:.08em;color:var(--ink-3)}
+.card dd{margin:1px 0 0;font-size:13px;color:var(--ink)}
+.card dd.val{font-family:var(--f-mono);font-size:12px;color:var(--accent)}
+.makers{display:flex;flex-wrap:wrap;gap:4px}
+.makers span{font-size:12px;background:var(--raise);border:1px solid var(--line);border-radius:4px;padding:1px 7px}
+.card-act{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.btn{background:var(--raise);border:1px solid var(--line-2);border-radius:5px;padding:5px 10px;font-size:12.5px;color:var(--ink)}
+.btn:hover{border-color:var(--ink-3)}
+.btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.card .fine{margin:10px 0 0;font-size:11px;color:var(--ink-3)}
+
+/* ---------- side panel ---------- */
+.panel{min-width:0;min-height:0;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;scrollbar-width:thin}
+.blk{padding:14px 16px;border-bottom:1px solid var(--line)}
+.blk:last-child{border-bottom:0}
+.brand h1{margin:0;font-size:21px;font-weight:900;letter-spacing:.02em;line-height:1.25}
+.brand h1 span{font-family:var(--f-mono);font-weight:600;font-size:12px;color:var(--accent);letter-spacing:.12em;margin-left:8px;vertical-align:3px}
+.brand p{margin:6px 0 0;font-size:12.5px;color:var(--ink-2)}
+h2{margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--ink-2);display:flex;align-items:baseline;gap:8px}
+h2 small{font-family:var(--f-mono);font-weight:400;color:var(--ink-3);letter-spacing:.06em;font-size:10.5px}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;padding:3px;background:var(--well);border:1px solid var(--line);border-radius:6px}
+.seg button{background:none;border:0;border-radius:4px;padding:5px 4px;font-size:12.5px;color:var(--ink-2);line-height:1.25}
+.seg button small{display:block;font-size:10.5px;color:var(--ink-3)}
+.seg button[aria-checked="true"]{background:var(--raise);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-2)}
+.seg button[aria-checked="true"] small{color:var(--accent)}
+.seg.big button{padding:7px 4px;font-family:var(--f-mono);font-weight:600;font-size:13.5px}
+.seg.big button small{font-family:var(--f-ui);font-weight:500;font-size:11px}
+.tdesc{margin:10px 0 0;font-size:12.5px;color:var(--ink-2)}
+.tex{margin:6px 0 0;font-size:11.5px;color:var(--ink-3)}
+.specs{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:10px 0 0;font-size:12px}
+.specs dt{color:var(--ink-3)}
+.specs dd{margin:0;font-family:var(--f-mono);font-size:11.5px;color:var(--ink)}
+
+.axis{padding:8px 0 10px;border-top:1px dashed var(--line)}
+.axis:first-of-type{border-top:0;padding-top:0}
+.axis-h{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.badge{font-family:var(--f-mono);font-weight:600;font-size:11px;width:20px;height:20px;display:grid;place-items:center;border-radius:4px;color:#0a0f12;background:var(--c)}
+.axis-h .pl{color:var(--ink-3);font-size:11.5px}
+.axis-h output{margin-left:auto;font-family:var(--f-mono);font-size:11.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.dual{position:relative;height:26px;margin-top:4px}
+.dual .track{position:absolute;left:7px;right:7px;top:11px;height:4px;border-radius:2px;background:var(--line-2)}
+.dual .fill{position:absolute;top:11px;height:4px;border-radius:2px;background:var(--c)}
+.dual input[type=range]{position:absolute;left:0;top:0;width:100%;height:26px;margin:0;background:none;-webkit-appearance:none;appearance:none;pointer-events:none}
+.dual input[type=range]::-webkit-slider-runnable-track{height:26px;background:transparent}
+.dual input[type=range]::-moz-range-track{background:transparent}
+.dual input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:auto;width:14px;height:20px;margin-top:3px;border-radius:3px;background:var(--ink);border:2px solid var(--c);cursor:ew-resize;box-sizing:border-box}
+.dual input[type=range]::-moz-range-thumb{pointer-events:auto;width:10px;height:16px;border-radius:3px;background:var(--ink);border:2px solid var(--c);cursor:ew-resize}
+.dual input[type=range]:focus-visible{outline:none}
+.dual input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--accent)}
+.dual input[type=range]:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px var(--accent)}
+.axis-f{display:flex;align-items:center;gap:10px;margin-top:4px;font-size:12px;color:var(--ink-2)}
+.axis-f label{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+.axis-f select{background:var(--well);border:1px solid var(--line-2);border-radius:4px;padding:1px 4px;font-size:12px}
+.axis-f select:disabled{opacity:.4}
+.axis-f .rst{margin-left:auto;background:none;border:0;color:var(--ink-3);font-size:12px;padding:0}
+.axis-f .rst:hover{color:var(--ink)}
+input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;margin:0}
+
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.chip{background:var(--raise);border:1px solid var(--line-2);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--ink)}
+.chip:hover{border-color:var(--ink-3)}
+.scan{display:flex;align-items:center;gap:10px;margin-top:10px}
+.scan .btn{display:inline-flex;align-items:center;gap:6px}
+.scan small{font-size:11.5px;color:var(--ink-3)}
+
+.ctl{display:grid;gap:12px}
+.ctl .row{display:grid;gap:5px}
+.ctl .lab{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2)}
+.ctl .lab output{font-family:var(--f-mono);font-size:11.5px;color:var(--ink)}
+.plain{width:100%;accent-color:var(--accent);margin:0}
+.chk{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.chk input{margin-top:4px}
+
+.sys{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.sys li{display:flex;align-items:center;gap:8px;font-size:12.5px;min-height:28px}
+.sys .sw{width:10px;height:10px;border-radius:2px;flex:none}
+.sys .nm{flex:1;min-width:0}
+.sys .nm small{font-family:var(--f-mono);color:var(--ink-3);font-size:10.5px;margin-left:5px}
+.tri{display:inline-grid;grid-auto-flow:column;gap:1px;background:var(--well);border:1px solid var(--line);border-radius:4px;padding:1px}
+.tri button{background:none;border:0;border-radius:3px;font-size:11px;padding:1px 6px;color:var(--ink-3)}
+.tri button[aria-checked="true"]{background:var(--raise);color:var(--ink)}
+.sys li.off .nm{color:var(--ink-3)}
+
+.search{width:100%;box-sizing:border-box;background:var(--well);border:1px solid var(--line-2);border-radius:5px;padding:6px 10px;font-size:13px}
+.search::placeholder{color:var(--ink-3)}
+.plist{list-style:none;margin:10px 0 0;padding:0}
+.plist .grp{font-size:11px;letter-spacing:.08em;color:var(--ink-3);margin:10px 0 3px;display:flex;align-items:center;gap:6px}
+.plist .grp:first-child{margin-top:0}
+.plist .grp i{width:8px;height:8px;border-radius:2px}
+.plist button{display:flex;width:100%;text-align:left;background:none;border:0;border-radius:4px;padding:4px 8px;font-size:13px;gap:8px;align-items:baseline}
+.plist button:hover{background:var(--raise)}
+.plist button[aria-current="true"]{background:var(--raise);box-shadow:inset 2px 0 0 var(--accent)}
+.plist button small{font-family:var(--f-mono);font-size:10.5px;color:var(--ink-3);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46%}
+.plist .none{font-size:12.5px;color:var(--ink-3);padding:6px 0}
+.note{font-size:11.5px;color:var(--ink-3)}
+.note p{margin:0 0 6px}
+.legend-hatch{display:inline-block;width:18px;height:11px;vertical-align:-1px;border:1px solid var(--line-2);background:repeating-linear-gradient(-45deg,#c9d3d8 0 1.5px,#6d7a80 1.5px 5px);border-radius:2px;margin-right:4px}
+
+@media (max-width:860px){
+  html,body{height:auto}
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto}
+  .stage{height:62svh;min-height:340px}
+  .panel{overflow:visible}
+  .hud-tr{display:none}
+  .views{top:auto;bottom:10px;left:10px;transform:none}
+  .views button{padding:3px 7px}
+  .hint{display:none}
+  .card{left:8px;right:8px;bottom:8px;width:auto;max-height:70%}
+  .hud-tl{font-size:10.5px}
+  .hud-br .mode{display:none}
+  #gizmo{width:64px;height:64px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
 </head>
 <body>
-    <img src="./assets/mycar/01.jpg" data-view360="true" data-frames="50" data-regexp="./assets/mycar/##.jpg" alt="">
+<div class="app">
+  <main class="stage" id="stage" aria-label="3D断面ビューアー">
+    <canvas id="gl" aria-label="車両の3Dモデル。ドラッグで回転、ホイールで拡大、部品をクリックで詳細表示"></canvas>
+    <div class="hud hud-tl" id="hudTL"></div>
+    <div class="hud hud-tr" id="hudTR"></div>
+    <div class="views" role="toolbar" aria-label="視点">
+      <button data-view="iso">斜め</button><button data-view="front">前</button><button data-view="rear">後</button><button data-view="side">右</button><button data-view="left">左</button><button data-view="top">上</button><button data-view="bottom">下</button>
+    </div>
+    <div class="hint" id="hint">ドラッグで回転・右ドラッグで移動・ホイールで拡大。部品をクリックすると詳細を表示。</div>
+    <div class="hud hud-br"><div class="mode" id="hudBR"></div><canvas id="gizmo" width="168" height="168" aria-hidden="true"></canvas></div>
+    <div class="tip" id="tip" hidden></div>
+    <section class="card" id="card" hidden aria-live="polite">
+      <div class="card-top"><span class="chip-sys" id="cSys"><i></i><span></span></span><button class="x" id="cClose" aria-label="閉じる">×</button></div>
+      <h3 id="cName"></h3>
+      <p class="en" id="cEn"></p>
+      <div class="types" id="cTypes"></div>
+      <dl id="cBody"></dl>
+      <div class="card-act">
+        <button class="btn" id="cFocus">ズームして強調</button>
+        <button class="btn" id="cIso" aria-pressed="false">ほかを半透明に</button>
+      </div>
+      <p class="fine">メーカーは代表例です。実際の採用は車種・世代・地域で異なります。</p>
+    </section>
+    <div class="loading" id="loading">モデルを構築しています…</div>
+  </main>
+
+  <aside class="panel">
+    <header class="blk brand">
+      <h1>電動車アナトミーCT<span>SECTION VIEWER</span></h1>
+      <p>代表的な電動車の内部を、X・Y・Zの3軸それぞれ両端から切って断面で観察できます。部品をクリックすると名前・役割・代表メーカーを表示します。</p>
+    </header>
+
+    <section class="blk" aria-labelledby="hType">
+      <h2 id="hType">パワートレイン <small>POWERTRAIN</small></h2>
+      <div class="seg big" role="radiogroup" aria-label="パワートレイン" id="typeSeg">
+        <button role="radio" data-type="bev" aria-checked="true">BEV<small>電気自動車</small></button>
+        <button role="radio" data-type="hev" aria-checked="false">HEV<small>ハイブリッド</small></button>
+        <button role="radio" data-type="phev" aria-checked="false">PHEV<small>プラグイン</small></button>
+      </div>
+      <p class="tdesc" id="tDesc"></p>
+      <dl class="specs" id="tSpecs"></dl>
+      <p class="tex" id="tEx"></p>
+    </section>
+
+    <section class="blk" aria-labelledby="hSec">
+      <h2 id="hSec">断面 <small>SECTION · ISO 8855 車両座標</small></h2>
+      <div id="axes"></div>
+      <div class="chips" id="presets" aria-label="断面プリセット">
+        <button class="chip" data-preset="all">全体</button>
+        <button class="chip" data-preset="mid">正中で縦割り</button>
+        <button class="chip" data-preset="motor">モーターを縦割り</button>
+        <button class="chip" data-preset="floor">床下を水平断</button>
+        <button class="chip" data-preset="front">前軸で輪切り</button>
+        <button class="chip" data-preset="rear">後軸で輪切り</button>
+        <button class="chip" data-preset="slab">中央スラブ</button>
+      </div>
+      <div class="scan">
+        <button class="btn" id="scanBtn" aria-pressed="false">▶ X軸スキャン</button>
+        <small>厚さ60 mmのスラブで前から後ろへ走査</small>
+      </div>
+    </section>
+
+    <section class="blk" aria-labelledby="hDisp">
+      <h2 id="hDisp">表示 <small>DISPLAY</small></h2>
+      <div class="ctl">
+        <div class="seg" role="radiogroup" aria-label="描画モード" id="modeSeg">
+          <button role="radio" data-mode="solid" aria-checked="true">標準<small>断面ハッチング</small></button>
+          <button role="radio" data-mode="xray" aria-checked="false">X線<small>透過・重なり強調</small></button>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="配色" id="colorSeg">
+          <button role="radio" data-color="sys" aria-checked="true">系統色</button>
+          <button role="radio" data-color="real" aria-checked="false">実物風</button>
+        </div>
+        <div class="row">
+          <div class="lab"><label for="ghost">半透明の濃さ</label><output id="ghostOut">14%</output></div>
+          <input class="plain" type="range" id="ghost" min="3" max="60" value="14">
+        </div>
+        <div class="row">
+          <div class="lab"><label for="explode">分解（エクスプロード）</label><output id="explodeOut">0%</output></div>
+          <input class="plain" type="range" id="explode" min="0" max="100" value="0">
+        </div>
+        <div class="row" id="cellRow">
+          <div class="lab"><span>電池セルの形式（BEV）</span></div>
+          <div class="seg" role="radiogroup" aria-label="電池セルの形式" id="cellSeg">
+            <button role="radio" data-cell="prismatic" aria-checked="true">角形</button>
+            <button role="radio" data-cell="cylindrical" aria-checked="false">円筒</button>
+            <button role="radio" data-cell="pouch" aria-checked="false">ラミネート</button>
+          </div>
+        </div>
+        <label class="chk"><input type="checkbox" id="isoChk">選択した部品以外を半透明にする</label>
+      </div>
+    </section>
+
+    <section class="blk" aria-labelledby="hSys">
+      <h2 id="hSys">系統 <small>SYSTEMS</small></h2>
+      <ul class="sys" id="sysList"></ul>
+    </section>
+
+    <section class="blk" aria-labelledby="hParts">
+      <h2 id="hParts">部品一覧 <small id="partCount"></small></h2>
+      <input class="search" type="search" id="q" placeholder="部品名・メーカー名で絞り込み" aria-label="部品を検索">
+      <ul class="plist" id="plist"></ul>
+    </section>
+
+    <footer class="blk note">
+      <p><span class="legend-hatch"></span>斜線の面が切断面です。中空の部材（サイドシル、モーターのハウジングなど）は輪の形で、詰まった部材は面で見えます。</p>
+      <p>形状と配置は、一般的な構成を簡略化した模式モデルです。寸法の例: 全長4,600 × 全幅1,840 × 全高1,500 mm、ホイールベース2,750 mm、トレッド1,580 mm。座標はISO 8855の車両座標系（X 前方・Y 左・Z 上）で、原点はホイールベース中央の路面です。</p>
+      <p>代表メーカーは公開情報にもとづく例示で、網羅や取引関係の証明ではありません。</p>
+    </footer>
+  </aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const TAU = Math.PI * 2;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+if (!window.THREE || !THREE.OrbitControls) {
+  $('#loading').textContent = '3Dライブラリを読み込めませんでした。ネットワーク接続を確認して再読み込みしてください。';
+  return;
+}
+
+/* ======================================================================
+   Systems & vehicle types
+   ====================================================================== */
+const SYS = {
+  exterior:{n:'外装パネル', e:'EXTERIOR', c:0x8ea6bf},
+  body:    {n:'ボディ骨格', e:'BODY-IN-WHITE', c:0x95a3b0},
+  battery: {n:'駆動用バッテリー', e:'TRACTION BATTERY', c:0xe2b84a},
+  edrive:  {n:'電動駆動', e:'E-DRIVE', c:0x47a9e6},
+  power:   {n:'充電・高電圧', e:'CHARGING & HV', c:0xff8a2a},
+  engine:  {n:'エンジン・燃料・排気', e:'ENGINE & FUEL', c:0xdc5a54},
+  thermal: {n:'熱マネジメント', e:'THERMAL', c:0x3fc6ae},
+  chassis: {n:'シャシー', e:'CHASSIS', c:0x7f8fa3},
+  cabin:   {n:'内装・安全', e:'CABIN & SAFETY', c:0xa98ae0},
+  elec:    {n:'電装・ADAS', e:'ELECTRONICS', c:0xe57fb0},
+};
+const SYS_ORDER = Object.keys(SYS);
+
+const TYPES = {
+  bev:{label:'BEV', jp:'電気自動車', layout:'後輪駆動・モーター1基',
+    desc:'エンジンを持たず、床下の大容量電池の電気だけでモーターを回して走ります。充電は普通充電（交流）と急速充電（直流）の2系統です。',
+    ex:'近い構成の例: テスラ モデル3（後輪駆動）、ヒョンデ IONIQ 5、日産 アリア、BYD SEAL',
+    specs:[['駆動用電池','約75 kWh・約400 V'],['モーター','1基（後輪）'],['エンジン','なし'],['外部充電','普通＋急速']], floor:0.33, kick:-0.99, rear:0.58},
+  hev:{label:'HEV', jp:'ハイブリッド', layout:'前輪駆動・シリーズパラレル式',
+    desc:'エンジンと2つのモーターを組み合わせます。外部からは充電せず、減速時の回生とエンジンの発電で小さな電池を充電します。表示はトヨタTHS IIのような動力分割式です。',
+    ex:'近い構成の例: トヨタ プリウス、アクア、カローラ（方式違い: ホンダ e:HEV、日産 e-POWER）',
+    specs:[['駆動用電池','約1 kWh・約200 V'],['モーター','2基（MG1・MG2）'],['エンジン','2.0 L 直列4気筒'],['外部充電','なし']], floor:0.22, kick:-0.88, rear:0.56},
+  phev:{label:'PHEV', jp:'プラグインハイブリッド', layout:'電気式4WD・シリーズパラレル式',
+    desc:'HEVに外部から充電できる中容量の電池を加えた構成です。毎日の距離は電気だけで走り、遠出ではハイブリッドとして走ります。表示は前輪をエンジン＋2モーター、後輪を別のモーターで駆動する4WDです。',
+    ex:'近い構成の例: トヨタ RAV4 PHEV、プリウスPHEV（方式違い: 三菱 アウトランダーPHEV）',
+    specs:[['駆動用電池','約18 kWh・約350 V'],['モーター','3基（前2・後1）'],['エンジン','2.5 L 直列4気筒'],['外部充電','普通充電']], floor:0.31, kick:-0.88, rear:0.58},
+};
+
+/* ======================================================================
+   Part catalogue (Japanese)
+   n: name, e: English, s: system, r: role, h: how it works / points,
+   v: typical values, m: representative makers, t: powertrains
+   ====================================================================== */
+const ALL = ['bev','hev','phev'];
+const INFO = {
+  hood:{n:'フード（ボンネット）', e:'Hood', s:'exterior',
+    r:'フロントの開口部を覆う外板。歩行者の頭部が当たったときに衝撃を吸収できるよう、下側に空間を確保しています。',
+    h:'軽量化のためアルミ製も多く使われます。BEVではエンジンがないぶん、フードの下がフロントトランク（フランク）になる車種もあります。',
+    v:'鋼板 約0.6–0.7 mm／アルミ板 約1 mm', m:['OEM内製（プレス）','日本製鉄','JFEスチール','神戸製鋼所（アルミ）','UACJ','Novelis']},
+  roof:{n:'ルーフ', e:'Roof panel', s:'exterior',
+    r:'車室の天井になる外板。横転時に乗員の空間を守る強度は、ピラーとルーフレールの骨格で受け持ちます。',
+    h:'BEVを中心にガラスルーフ（パノラマルーフ）が増えています。通信用のシャークフィンアンテナもここに付きます。',
+    m:['日本製鉄','POSCO','ArcelorMittal','AGC（ガラスルーフ）','Saint-Gobain Sekurit','福耀玻璃（Fuyao）']},
+  trunk:{n:'トランクリッド', e:'Trunk lid', s:'exterior',
+    r:'荷室の開閉パネル。リアガラスと一緒に開くバックドア（テールゲート）形式の車も多くあります。',
+    h:'樹脂製のバックドアで軽量化する例もあります。リアカメラやナンバー灯を内蔵します。',
+    m:['OEM内製','OPmobility（旧Plastic Omnium）','Magna']},
+  bumpers:{n:'バンパーフェイシア（前後）', e:'Bumper fascias', s:'exterior',
+    r:'車体の前後端を覆う樹脂の外装。見た目と空力を決め、軽い接触から車体を守ります。',
+    h:'裏側にミリ波レーダーや超音波センサーを内蔵します。BEVは冷却用の開口が少なくて済むため、グリルを塞いで空気抵抗を下げることが多いです。',
+    v:'材料 PP（ポリプロピレン）系樹脂', m:['OPmobility（旧Plastic Omnium）','Magna','ダイキョーニシカワ']},
+  bodyside:{n:'ボディサイド（ドア・ピラー）', e:'Body side & doors', s:'exterior',
+    r:'側面の外板とドア。A・B・Cピラーがルーフを支え、ドア開口のまわりが車体の強さを左右します。',
+    h:'サイドアウターは大きな一枚の鋼板からプレス成形します。ドアの内側には側面衝突に備えたインパクトビームが入っています。',
+    m:['OEM内製（プレス）','日本製鉄','JFEスチール','POSCO']},
+  glass:{n:'ウインドウガラス', e:'Glazing', s:'exterior',
+    r:'視界の確保と、遮音・遮熱・紫外線カットを担います。',
+    h:'フロントは2枚のガラスで樹脂膜を挟んだ合わせガラス、サイドとリアは強化ガラスが基本です。モーター走行は静かで風切り音が目立つため、サイドも遮音合わせガラスにする例が増えています。',
+    v:'フロント 合わせガラス 約4.5–5 mm', m:['AGC','日本板硝子（NSG／Pilkington）','Saint-Gobain Sekurit','福耀玻璃（Fuyao）','セントラル硝子','中間膜: 積水化学・Eastman・クラレ']},
+
+  floor:{n:'フロアパネル', e:'Floor pan', s:'body',
+    r:'車室の床。クロスメンバーやサイドシルと組み合わさって、車体のねじり剛性を受け持ちます。',
+    h:'BEVは床下全面に電池を抱えるため、床が平らで高めです。電池ケースを床そのものとして使う構造（BYDのCTB、テスラの構造用パック）もあります。HEVは後席下に電池を置くことが多く、後席まわりの床の形が変わります。',
+    m:['OEM内製','ジーテクト','ユニプレス','Gestamp','Magna','Benteler']},
+  dash:{n:'ダッシュパネル（バルクヘッド）', e:'Dash panel', s:'body',
+    r:'フロントの機器室と車室を仕切る隔壁。ステアリングシャフトや配管が貫通し、ブレーキユニットが取り付きます。',
+    h:'遮音材と組み合わせ、エンジン音や、モーター・インバーターの高い周波数の音が車内に入るのを抑えます。',
+    m:['OEM内製','遮音材: Autoneum・ニチアス']},
+  sill:{n:'サイドシル（ロッカー）', e:'Side sill', s:'body',
+    r:'ドアの下を前後に走る閉断面の骨格。前面衝突の荷重を後ろへ流し、側面衝突ではキャビンのつぶれを防ぎます。',
+    h:'BEVでは側面の衝撃が電池に届かないよう、内部をリブで仕切ったアルミ押出材や補強材を入れることが多いです。このモデルでもBEVを選ぶと、断面に十字のリブが現れます。',
+    m:['日本製鉄','JFEスチール','UACJ（アルミ押出）','Constellium','Norsk Hydro','Gestamp']},
+  frontMember:{n:'フロントサイドメンバー・クラッシュボックス', e:'Front side member & crash box', s:'body',
+    r:'前面衝突のとき、蛇腹のようにつぶれて衝撃エネルギーを吸収する前後方向の骨格です。',
+    h:'先端のクラッシュボックスは低速の衝突で先に潰れる交換部品。電動車はエンジンブロックという硬いかたまりがないため、つぶれ方の設計が変わります。',
+    m:['Gestamp','Benteler','Magna（Cosma）','豊田鉄工','ジーテクト']},
+  rearMember:{n:'リアサイドメンバー', e:'Rear side member', s:'body',
+    r:'荷室の床下を前後に走る骨格。後面衝突のエネルギーを吸収し、燃料タンクや電池、充電器を守ります。',
+    m:['Gestamp','Benteler','Magna（Cosma）','ジーテクト']},
+  bumperBeam:{n:'バンパーリインフォースメント', e:'Bumper beam', s:'body',
+    r:'バンパー内部の補強梁。衝突の荷重を左右のサイドメンバーへ分散させます。',
+    h:'アルミ押出材や、焼き入れで1.5 GPa級まで強くしたホットスタンプ鋼が使われます。',
+    m:['神戸製鋼所','Benteler','Constellium','Norsk Hydro','Gestamp']},
+  crossMember:{n:'フロアクロスメンバー', e:'Floor cross member', s:'body',
+    r:'床を左右に横断する骨格。シートの取り付けの土台になり、側面衝突の荷重を反対側へ逃がします。',
+    m:['OEM内製','ジーテクト','ユニプレス','Gestamp']},
+  bpillar:{n:'Bピラー補強', e:'B-pillar reinforcement', s:'body',
+    r:'前後ドアの間の柱。側面衝突のときに乗員の空間を守る、もっとも重要な骨格のひとつです。',
+    h:'鋼板を約900 ℃に加熱し、プレスと同時に焼き入れするホットスタンプ材が主流です。',
+    v:'引張強さ 約1,500 MPa（ホットスタンプ材）', m:['Gestamp','Benteler','Magna（Cosma）','豊田鉄工','材料: 日本製鉄・JFE・ArcelorMittal']},
+  wheelhouse:{n:'ホイールハウス・インナーライナー', e:'Wheelhouse & liner', s:'body',
+    r:'タイヤのまわりを囲む空間とその内張り。泥や小石が車体に当たるのを防ぎます。',
+    h:'モーター走行は静かなため、タイヤが出すロードノイズが目立ちます。BEVでは吸音性の高い不織布のライナーがよく使われます。',
+    m:['Autoneum','Röchling']},
+  frunk:{n:'フロントトランク（フランク）', e:'Front trunk', s:'body', t:['bev'],
+    r:'エンジンがないBEVのフロントにできる収納スペースです。',
+    h:'充電ケーブルの収納などに使います。前面衝突時のつぶれしろも兼ねます。',
+    m:['OEM内製','樹脂成形メーカー各社']},
+
+  packCase:{n:'バッテリーパック（ケース）', e:'Battery pack enclosure', s:'battery', t:['bev'],
+    r:'走るためのエネルギーをすべてためる、車でいちばん重く高価な部品の外殻。セル、BMS、冷却プレート、ジャンクションボックスを収め、衝突・浸水・飛び石から守ります。',
+    h:'床下の低い位置に置くので重心が下がります。ケースはアルミ押出材の枠を溶接したものや鋼板製が多く、防水（IP67相当）と、熱暴走時のガスを逃がすベントを備えます。800 V化（ポルシェ タイカン、ヒョンデ IONIQ 5など）で急速充電の時間を短くする動きがあります。',
+    v:'容量 50–100 kWh／電圧 約350–400 V（800 V系も）／重量 約300–600 kg',
+    m:['パックはOEM内製が主流','ケース: Gestamp・Benteler・Magna・Constellium・Norsk Hydro・UACJ']},
+  bevCells:{n:'バッテリーセル', e:'Battery cells', s:'battery', t:['bev'], r:'', m:[]},
+  coolPlate:{n:'冷却プレート', e:'Cold plate', s:'battery', t:['bev','phev'],
+    r:'セルの下に敷き、冷却水を流して電池を適温（おおむね15–35 ℃）に保ちます。',
+    h:'急速充電中は電池が発熱するので冷やし、冬はヒートポンプやヒーターで温めておくと充電が速くなります（プレコンディショニング）。セルとの間には熱を伝える放熱材（TIM）を挟みます。',
+    m:['Valeo','Mahle','Hanon Systems','Modine','Dana','放熱材: Henkel・Dow・3M']},
+  bdu:{n:'ジャンクションボックス（BDU）', e:'Battery disconnect unit', s:'battery', t:['bev','phev'],
+    r:'電池の電気の出入口。メインリレー（コンタクタ）、ヒューズ、電流センサーをまとめ、停車中や衝突時に高電圧を遮断します。',
+    h:'リレーをいきなり閉じると大きな突入電流が流れるため、抵抗を通して少しずつ充電するプリチャージ回路を持ちます。衝突を検知すると火薬で回路を断つパイロヒューズを使う車もあります。',
+    m:['矢崎総業','Lear','Eaton','コンタクタ: パナソニック・TE Connectivity・Sensata（GIGAVAC）','パイロヒューズ: Autoliv・Mersen・Littelfuse']},
+  bms:{n:'BMS（バッテリーマネジメントシステム）', e:'Battery management system', s:'battery', t:['bev','phev'],
+    r:'すべてのセルの電圧と温度を監視し、残量（SOC）と劣化の度合い（SOH）を推定する、電池の頭脳です。',
+    h:'セル間の電圧のばらつきをそろえるセルバランス、過充電・過放電の防止、充電電流の制御を行います。配線を減らす無線BMSも実用化されています。',
+    m:['デンソー','日立Astemo','LGエナジーソリューション','Marelli','IC: Analog Devices・Texas Instruments・NXP・Infineon・ルネサス']},
+  hevBattery:{n:'駆動用バッテリー（HEV）', e:'Hybrid battery pack', s:'battery', t:['hev'],
+    r:'ブレーキ時に回生した電気をため、発進や加速でモーターに渡します。外部からは充電しません。',
+    h:'容量は小さいものの出し入れの回数がとても多いので、高出力型のセルを使います。後席の下に置き、車室内の空気をブロワーで送って冷やす空冷式が多く、ニッケル水素とリチウムイオンの両方が使われています。',
+    v:'容量 約0.7–1.6 kWh／電圧 約200–300 V（PCUで最大約650 Vに昇圧）',
+    m:['トヨタバッテリー（旧プライムアースEVエナジー）','豊田自動織機（バイポーラ型ニッケル水素）','プライムプラネットエナジー&ソリューションズ','ブルーエナジー（GSユアサ×ホンダ）','パナソニック エナジー','Samsung SDI']},
+  hevCells:{n:'電池セル（HEV）', e:'Hybrid battery cells', s:'battery', t:['hev'],
+    r:'小さなセルを直列につないで、200 V前後の電圧を作ります。',
+    h:'リチウムイオンなら3.6 V級のセルを約50–60個、ニッケル水素なら1.2 Vのセル6個を組んだモジュールを約28本直列にします。このモデルは角形リチウムイオン56セルで表示しています。',
+    v:'例: 3.6 V × 56セル ≒ 約200 V', m:['トヨタバッテリー','プライムプラネットエナジー&ソリューションズ','ブルーエナジー','パナソニック エナジー']},
+  phevPack:{n:'駆動用バッテリー（PHEV）', e:'PHEV battery pack', s:'battery', t:['phev'],
+    r:'家庭や充電スポットで充電でき、日常の距離ならエンジンをかけずにモーターだけで走れる中容量の電池です。',
+    h:'HEVより大きく、BEVより小さい電池です。床下に置き、冷却水で温度を管理します。電池が減るとHEVと同じようにエンジンで発電しながら走ります。',
+    v:'容量 約10–25 kWh／EV走行距離 約50–100 km（WLTC）',
+    m:['パナソニック エナジー','プライムプラネットエナジー&ソリューションズ','AESC','LGエナジーソリューション','CATL','Samsung SDI']},
+  phevCells:{n:'電池セル（PHEV）', e:'PHEV battery cells', s:'battery', t:['phev'],
+    r:'電気をためる最小単位。PHEVでは角形セルを数十～100個ほど直列につなぎます。',
+    h:'BEV用より容量を抑え、そのぶん大きな電流を出し入れできるよう設計されます。このモデルは角形96セル（3モジュール）で表示しています。',
+    v:'例: 3.7 V × 96セル ≒ 約355 V', m:['パナソニック エナジー','プライムプラネットエナジー&ソリューションズ','CATL','LGエナジーソリューション','Samsung SDI']},
+
+  bevMotor:{n:'駆動用モーター', e:'Traction motor', s:'edrive', t:['bev'],
+    r:'電気の力で車輪を回します。減速時は発電機になり、運動エネルギーを電気に戻します（回生ブレーキ）。',
+    h:'ネオジム磁石をロータに埋め込んだ永久磁石同期モーター（IPMSM）が主流です。断面では、ハウジング→ステータ（銅の巻線入り）→ロータ（磁石入り）→シャフトの同心円が見えます。磁石を使わない巻線界磁型（ルノー、BMW）や誘導モーターもあります。',
+    v:'出力 約100–300 kW／最高回転 約15,000–20,000 rpm／最高効率 95 %以上',
+    m:['OEM内製（テスラ、BYD、トヨタ、日産ほか）','ニデック','デンソー','アイシン','BorgWarner','Bosch','ZF','日立Astemo','明電舎','Valeo','磁石: 信越化学・プロテリアル']},
+  bevInverter:{n:'インバーター', e:'Traction inverter', s:'edrive', t:['bev'],
+    r:'電池の直流を三相交流に変え、周波数と電流でモーターの回転数とトルクを決めます。回生時は逆に交流を直流に戻します。',
+    h:'パワー半導体を高速でオン・オフして電流を作ります。シリコンIGBTから、損失の少ないSiC（炭化ケイ素）MOSFETへの置き換えが進み、航続距離の延長や800 V化を支えています。中にはコンデンサー、パワーモジュール、制御基板が入っています。',
+    v:'効率 約98 %以上', m:['デンソー','日立Astemo','Bosch','BorgWarner','Valeo','Schaeffler（旧Vitesco）','三菱電機','半導体: Infineon・STMicroelectronics・onsemi・ローム・Wolfspeed']},
+  bevReducer:{n:'減速機・デファレンシャル', e:'Reduction gear & differential', s:'edrive', t:['bev'],
+    r:'モーターの高回転を歯車で落としてトルクを増やし、左右の車輪へ分けて伝えます。',
+    h:'モーターは低回転から大きなトルクが出るので、多段の変速機はいらず、2段の歯車で一定の比率に減速するだけで足ります（ポルシェ タイカンなど2速の例もあります）。モーター・インバーターと一体にしたユニットを「eAxle（イーアクスル）」と呼びます。',
+    v:'減速比 約8–12', m:['アイシン','ジヤトコ','ZF','GKN（Dualis）','Schaeffler','BorgWarner','Magna','武蔵精密工業','eAxle: ニデック・BluE Nexus']},
+  hevTransaxle:{n:'ハイブリッドトランスアクスル', e:'Hybrid transaxle', s:'edrive', t:['hev','phev'],
+    r:'エンジンと2つのモーター（MG1・MG2）の力を合わせたり分けたりして前輪へ伝えるユニット。ケースの中に減速ギア、デフ、エンジンとの間のダンパーも入っています。',
+    h:'この表示はトヨタTHS IIのような「シリーズ・パラレル式」です。歯車式の変速機を持たず、遊星歯車とモーターの制御で変速比を連続的に変えます（電気式無段変速）。ホンダ e:HEVは主にエンジンを発電に使い、高速巡航だけクラッチでエンジンを直結します。日産 e-POWERはエンジンを発電専用にしたシリーズ式です。',
+    m:['トヨタ（内製）','アイシン','ホンダ（e:HEV、内製）','日産（e-POWER、内製）']},
+  mg1:{n:'MG1（発電用モーター）', e:'Motor-generator 1', s:'edrive', t:['hev','phev'],
+    r:'主にエンジンの力で発電します。エンジンを始動するスターターも兼ねています。',
+    h:'遊星歯車のサンギアにつながり、その回転数を変えることで、エンジン回転数と車速の比率（変速比）をコントロールします。エンジン車のセルモーターとオルタネーターの役目をまとめて担っています。',
+    m:['トヨタ（内製）','アイシン','デンソー']},
+  mg2:{n:'MG2（駆動用モーター）', e:'Motor-generator 2', s:'edrive', t:['hev','phev'],
+    r:'前輪を駆動するメインのモーター。発進や低速ではMG2だけで走れ、減速時は回生発電します。',
+    h:'エンジンの力に上乗せして加速を助けます。ネオジム磁石を使う永久磁石同期モーターです。',
+    v:'出力 約50–90 kW級（車種による）', m:['トヨタ（内製）','アイシン','デンソー']},
+  psd:{n:'動力分割機構（遊星歯車）', e:'Power split device', s:'edrive', t:['hev','phev'],
+    r:'エンジンの力を「車輪を回す分」と「MG1で発電する分」に分ける歯車機構です。',
+    h:'中心のサンギアにMG1、遊星歯車を支えるキャリアにエンジン、外側のリングギアに出力軸（MG2と車輪）がつながります。これでエンジン回転を車速から切り離し、効率のよい回転数で回せます。',
+    m:['トヨタ（内製）','アイシン']},
+  pcu:{n:'PCU（パワーコントロールユニット）', e:'Power control unit', s:'edrive', t:['hev','phev'],
+    r:'MG1・MG2用のインバーター、昇圧コンバーター、DC-DCコンバーターをひとまとめにした電力制御の中枢です。',
+    h:'電池の200 V台の電圧を最大約650 Vまで昇圧して、モーターを効率よく回します。12 V系への給電もここから行うため、HEVにはオルタネーターがありません。トランスアクスルの真上に載せて配線を短くしています。',
+    m:['デンソー','トヨタ（内製）','日立Astemo','三菱電機','パワー半導体: デンソー・富士電機・三菱電機']},
+  rearEdu:{n:'リア駆動ユニット（電気式4WD）', e:'Rear e-drive unit', s:'edrive', t:['phev'],
+    r:'後輪をモーターで駆動するユニット。前後をつなぐプロペラシャフトなしで4WDになります。',
+    h:'モーター・減速機・インバーターを一体化しています。発進時や滑りやすい路面で後輪にトルクを配分し、減速時は後輪でも回生します。トヨタは「E-Four」、三菱は「ツインモーター4WD」と呼んでいます。',
+    m:['アイシン','デンソー','明電舎','OEM内製']},
+
+  hvCable:{n:'高電圧ケーブル', e:'High-voltage cable', s:'power',
+    r:'電池・インバーター・充電口・電動コンプレッサーなどを結ぶ、大電流の電線です。',
+    h:'オレンジ色は高電圧（直流60 V超）の目印として各国の規格で使われ、整備士がひと目で分かるようになっています。電磁ノイズを抑えるシールド入りで、軽量化のためアルミ導体も使われます。',
+    v:'導体断面積 約25–95 mm²（用途による）', m:['矢崎総業','住友電気工業（住友電装）','古河電気工業','フジクラ','Aptiv','Leoni','Lear']},
+  chargePort:{n:'充電インレット', e:'Charging inlet', s:'power', t:['bev','phev'],
+    r:'充電ケーブルを差し込む、車側のコネクターです。',
+    h:'規格は地域で異なります。日本は急速充電がCHAdeMO、普通充電がType 1（SAE J1772）で、BEVは2つの口を持つことが多いです（このモデルのBEVも2口、PHEVは普通充電のみ）。欧州はCCS2、中国はGB/T、北米はテスラ由来のNACS（SAE J3400）へ移行中です。充電中はロックがかかり、端子の温度をセンサーで監視します。',
+    m:['矢崎総業','住友電装','日本航空電子工業（JAE）','TE Connectivity','Phoenix Contact','Amphenol']},
+  obc:{n:'車載充電器（OBC）・DC-DCコンバーター', e:'On-board charger & DC-DC', s:'power', t:['bev','phev'],
+    r:'OBCは家庭や普通充電器の交流を直流に変えて電池を充電します。DC-DCコンバーターは高電圧から12 V系へ電気を送ります（エンジン車のオルタネーターの代わり）。',
+    h:'急速充電（直流）はOBCを通らず、ジャンクションボックスから直接電池へ入ります。双方向のOBCなら、車から家電や家に給電できます（V2L・V2H）。',
+    v:'OBC出力 約3–11 kW（日本は6 kW前後が多い）／DC-DC 約2–3 kW', m:['豊田自動織機','デンソー','デルタ電子','Lear','Valeo','BorgWarner','LGマグナ イーパワートレイン']},
+
+  engineBlock:{n:'エンジン（シリンダーブロック）', e:'Engine block & crankcase', s:'engine', t:['hev','phev'],
+    r:'燃料を燃やして力を生む本体。ハイブリッドでは、効率のよい回転域を中心に使われます。',
+    h:'HEV用は吸気バルブを遅く閉じて膨張比を大きくとる「アトキンソンサイクル」で、熱効率40 %を超える例もあります。断面では4つのシリンダーの穴（ボア）とピストンが見えます。',
+    v:'直列4気筒 1.5–2.5 L／最大熱効率 約40 %／圧縮比 約13–14', m:['OEM内製（トヨタ、ホンダ、日産ほか）','鋳造: アイシン・リョービ']},
+  piston:{n:'ピストン・コンロッド・クランクシャフト', e:'Piston, conrod & crankshaft', s:'engine', t:['hev','phev'],
+    r:'燃焼の圧力でピストンが押し下げられ、コンロッドとクランクシャフトで回転運動に変わります。',
+    h:'HEVではエンジンの始動と停止が頻繁なので、摩擦を減らす表面処理や張力の低いピストンリングが使われます。',
+    m:['Mahle','アート金属工業','NPR-RIKEN（ピストンリング）','OEM内製（クランク）']},
+  cylHead:{n:'シリンダーヘッド・動弁系', e:'Cylinder head & valvetrain', s:'engine', t:['hev','phev'],
+    r:'燃焼室の天井。吸排気バルブ、それを動かすカムシャフト、点火プラグ、インジェクターが集まっています。',
+    h:'バルブを開くタイミングを変える可変バルブタイミング（VVT）で、アトキンソンサイクルと通常の燃焼を使い分けます。',
+    m:['OEM内製','VVT: デンソー・アイシン・Schaeffler','バルブ: フジオーゼックス','点火プラグ: Niterra（旧日本特殊陶業）・デンソー']},
+  intake:{n:'吸気系（インテークマニホールド・スロットル）', e:'Intake system', s:'engine', t:['hev','phev'],
+    r:'エアクリーナーで空気をろ過し、スロットルで量を調整して各シリンダーへ配ります。',
+    m:['愛三工業','トヨタ紡織','デンソー','Mahle','Mann+Hummel']},
+  exhaustMani:{n:'排気マニホールド・触媒コンバーター', e:'Exhaust manifold & catalyst', s:'engine', t:['hev','phev'],
+    r:'排気ガスを集め、三元触媒（白金・パラジウム・ロジウム）でCO・HC・NOxを浄化します。',
+    h:'HEVはエンジンが止まっている時間が長く、触媒が冷えると浄化力が落ちます。そのためエンジンのすぐ後ろに触媒を置いて素早く温めます。',
+    m:['キャタラー','Umicore','BASF','エヌ・イー ケムキャット','担体: 日本ガイシ・Corning','排気系: フタバ産業・三五']},
+  exhaustPipe:{n:'排気管・マフラー', e:'Exhaust pipe & muffler', s:'engine', t:['hev','phev'],
+    r:'排気ガスを車体の後方へ導き、マフラーで音を小さくします。',
+    h:'一部のHEVは排気の熱を回収して冷却水を温め、暖房やエンジンの暖機を早めます（排気熱再循環システム）。',
+    m:['フタバ産業','三五','Forvia','Tenneco','Eberspächer']},
+  fuelTank:{n:'燃料タンク', e:'Fuel tank', s:'engine', t:['hev','phev'],
+    r:'ガソリンをためるタンク。後席の下から後輪の手前あたりに置くことが多いです。',
+    h:'多層構造の樹脂タンクが主流です。PHEVはエンジンが何週間も動かないことがあるため、燃料の蒸発ガスを閉じ込める密閉式（耐圧）タンクを使います。断面では中の燃料も見えます。',
+    v:'容量 約40–55 L', m:['OPmobility','Kautex（Textron）','TI Fluid Systems','FTS','八千代工業']},
+
+  frontEnd:{n:'ラジエーター・コンデンサー・電動ファン', e:'Front-end cooling module', s:'thermal',
+    r:'走行風とファンで、冷却水の熱とエアコンの冷媒の熱を外へ逃がします。',
+    h:'HEVはエンジン用（約90 ℃）と、インバーター・モーター用（約65 ℃）の2系統の冷却水をそれぞれ冷やします。BEVは発熱が少ないため、グリルシャッターを閉じて空気抵抗を減らせる時間が長くなります。',
+    m:['デンソー','Valeo','Mahle','Hanon Systems','T.RAD','Modine']},
+  compressor:{n:'電動コンプレッサー', e:'Electric A/C compressor', s:'thermal',
+    r:'エアコンの冷媒を圧縮するポンプ。エンジンのベルトではなく、高電圧のモーターで回します。',
+    h:'エンジンが止まっていても冷房できます。BEVではヒートポンプ暖房と電池の冷却（チラー）も担う、熱マネジメントの心臓部です。',
+    v:'駆動電圧 約200–800 V', m:['豊田自動織機','デンソー','Hanon Systems','サンデン（Hisense傘下）','Mahle']},
+  thermalModule:{n:'統合熱マネジメントモジュール', e:'Integrated thermal module', s:'thermal', t:['bev'],
+    r:'冷媒と冷却水の回路を多方弁でまとめて切り替え、車室・電池・モーターの間で熱をやりとりします。',
+    h:'外気やモーターの廃熱から熱をくみ上げるヒートポンプで暖房すると、電気ヒーターだけより消費電力が少なく、冬の航続距離の落ち込みを抑えられます。テスラの「オクトバルブ」が代表例です。',
+    m:['デンソー','Valeo','Hanon Systems','Mahle','三花智控（Sanhua）']},
+  hvac:{n:'空調ユニット（HVAC）', e:'HVAC unit', s:'thermal',
+    r:'インパネの奥にある空調の本体。送風機、冷やすエバポレーター、温めるヒーターコア、温度を混ぜるドアが入っています。',
+    h:'エンジン車は暖房にエンジンの廃熱を使いますが、BEVにはそれがないため、ヒートポンプや電気ヒーター（PTCヒーター）で温風を作ります。',
+    m:['デンソー','Valeo','Hanon Systems','Mahle','Marelli','PTCヒーター: Webasto・Eberspächer・BorgWarner']},
+  coolantPipe:{n:'冷却水配管', e:'Coolant lines', s:'thermal',
+    r:'電池・モーター・インバーター・ラジエーターの間で冷却水（LLC）を循環させるホースとパイプです。',
+    m:['住友理工','ニチリン','豊田合成','Cooper Standard','ContiTech']},
+  hevBattFan:{n:'電池冷却ブロワー', e:'Battery cooling blower', s:'thermal', t:['hev'],
+    r:'HEVの駆動用電池に、車室内の空気を送って冷やすファンです。',
+    h:'吸込口は後席の足元やシートの脇にあります。荷物でふさぐと電池の温度が上がり、出力が制限されることがあります。',
+    m:['デンソー','Valeo','Mahle']},
+
+  tire:{n:'タイヤ', e:'Tire', s:'chassis',
+    r:'車と路面の唯一の接点。荷重を支え、駆動・制動・旋回の力を路面へ伝えます。',
+    h:'電動車は電池のぶん重いので、高荷重に対応する規格（HL・XL）が増えています。航続距離のために転がり抵抗を小さくし、静かな車内で目立つロードノイズを抑える吸音スポンジを内側に貼ることもあります。断面では内側が空気の空洞になっているのが分かります。',
+    v:'例: 235/45R18（幅235 mm・扁平率45 %・18インチ）', m:['ブリヂストン','ミシュラン','グッドイヤー','コンチネンタル','住友ゴム（ダンロップ）','横浜ゴム','TOYO TIRE','ピレリ','ハンコック']},
+  wheel:{n:'ホイール', e:'Wheel', s:'chassis',
+    r:'タイヤを支え、ハブに固定する金属の輪です。',
+    h:'アルミの鋳造・鍛造が主流です。BEVでは空気抵抗を減らす平らなデザインや、樹脂カバー付きが多くあります。',
+    v:'例: 18×8J', m:['中信戴卡（CITIC Dicastal）','Ronal','Borbet','エンケイ','中央精機','トピー工業','RAYS']},
+  brakeDisc:{n:'ブレーキディスク', e:'Brake rotor', s:'chassis',
+    r:'パッドで両側から挟まれ、運動エネルギーを摩擦熱に変えて車を止める円盤です。',
+    h:'中空のベンチレーテッド構造で放熱します（断面で2枚の板の間に隙間が見えます）。電動車は回生ブレーキで減速することが多く、摩擦ブレーキの出番が少ないぶん錆びやすくなります。VW ID.シリーズのように後輪をドラムブレーキにする例もあります。',
+    m:['Brembo','アドヴィックス','曙ブレーキ工業','日立Astemo','ZF','AUMOVIO（旧Continental）']},
+  caliper:{n:'ブレーキキャリパー', e:'Brake caliper', s:'chassis',
+    r:'油圧でピストンを押し出し、ブレーキパッドをディスクに押しつけます。',
+    h:'後輪には電動パーキングブレーキのモーターを内蔵するものが多いです。',
+    m:['アドヴィックス','Brembo','曙ブレーキ工業','日立Astemo','ZF','HL Mando','パッド: 日清紡ブレーキ']},
+  hub:{n:'ハブベアリング・ナックル', e:'Hub bearing & knuckle', s:'chassis',
+    r:'車輪を回転自在に支える軸受と、それを保持してサスペンションとつなぐ部品です。',
+    m:['NTN','ジェイテクト','Schaeffler','SKF','Timken']},
+  frontSusp:{n:'フロントサスペンション（ストラット式）', e:'MacPherson strut', s:'chassis',
+    r:'路面の凹凸を吸収し、タイヤを路面に押しつけておきます。',
+    h:'ショックアブソーバーとコイルスプリングを一体にした支柱（ストラット）、下側のロアアーム、左右をつなぐスタビライザーで構成されます。電動車は重いので、ばねとダンパーを強めに設定します。',
+    m:['KYB','日立Astemo','ZF（Sachs）','Tenneco（Monroe）','ばね: ニッパツ・中央発條','アーム: ヨロズ・エフテック']},
+  rearSusp:{n:'リアサスペンション（マルチリンク式）', e:'Multi-link rear suspension', s:'chassis',
+    r:'複数のアームで後輪の位置と角度を細かく制御するサスペンションです。',
+    h:'小型のHEVでは構造の簡単なトーションビーム式も多く使われます。BEVではアームの間をくぐるようにeAxleが収まります。',
+    m:['KYB','日立Astemo','ZF','ヨロズ','エフテック','Magna']},
+  frontSubframe:{n:'フロントサブフレーム', e:'Front subframe', s:'chassis',
+    r:'サスペンションアーム、ステアリングギア、パワートレインを下から支える枠です。',
+    h:'ゴムブッシュを介して車体に取り付け、振動が車室に伝わるのを抑えます。',
+    m:['ヨロズ','エフテック','Magna','Benteler','Gestamp']},
+  rearSubframe:{n:'リアサブフレーム', e:'Rear subframe', s:'chassis',
+    r:'リアサスペンションを支える枠。BEVやPHEVでは後輪の駆動ユニットもここに載ります。',
+    m:['ヨロズ','エフテック','Magna','Benteler']},
+  steeringRack:{n:'電動パワーステアリング（EPS）', e:'Electric power steering', s:'chassis',
+    r:'ハンドルの回転を左右の動きに変えてタイヤの向きを変え、モーターで操舵の力を補助します。',
+    h:'油圧ポンプがいらないので電動車と相性がよい方式です。車線維持支援や自動駐車では、コンピューターがこのモーターでハンドルを動かします。ハンドルと機械的につながないステアバイワイヤも登場しています。',
+    m:['ジェイテクト','NSKステアリング&コントロール','Bosch','ZF','Nexteer','HL Mando','日立Astemo']},
+  brakeUnit:{n:'電動ブレーキユニット（回生協調）', e:'Brake-by-wire unit', s:'chassis',
+    r:'ブレーキペダルの踏み込みを電気信号で受け、回生ブレーキと油圧ブレーキの配分を決めます。',
+    h:'エンジン車はエンジンの吸気負圧でブレーキを軽くしますが、電動車にはその負圧がほとんどないため、モーターで油圧を作ります。できるだけ回生で止めて電気を回収し、足りない分だけ油圧ブレーキを使います（回生協調ブレーキ）。ABSや横滑り防止装置（ESC）も内蔵しています。',
+    m:['アドヴィックス','Bosch','AUMOVIO（旧Continental）','ZF','日立Astemo','HL Mando']},
+  driveShaft:{n:'ドライブシャフト', e:'Drive shaft', s:'chassis',
+    r:'デフから左右の車輪へ回転を伝える軸です。',
+    h:'両端の等速ジョイント（CVJ）で、ハンドルを切ったりサスペンションが上下したりしても回転をなめらかに伝えます。モーターは発進直後から最大トルクが出るため、強度に余裕が必要です。',
+    m:['NTN','GKN','ジェイテクト','Nexteer','Hyundai WIA']},
+
+  seatsFront:{n:'フロントシート', e:'Front seats', s:'cabin',
+    r:'運転姿勢を保ち、衝突時には乗員を正しい位置に保持します。',
+    h:'BEVは床下に電池があるため床が高く、座面との高さの差が小さくなりがちです。シートヒーターは空調より少ない電力で体を温められるので、冬の電費対策にもなります。',
+    m:['トヨタ紡織','テイ・エステック','Adient','Lear','Forvia','タチエス']},
+  seatRear:{n:'リアシート', e:'Rear seat', s:'cabin',
+    r:'後席の乗員を支える座面と背もたれです。',
+    h:'HEVは座面の下に駆動用電池を置くことが多いです。',
+    m:['トヨタ紡織','テイ・エステック','Adient','Lear','Forvia','タチエス']},
+  ip:{n:'インストルメントパネル・センターコンソール', e:'Instrument panel & console', s:'cabin',
+    r:'運転席前の内装。空調の吹き出し口や助手席エアバッグを収め、内部をステアリング支持用の鋼管が横断しています。',
+    h:'中は空洞で、奥に空調ユニットが収まっています（断面で確認できます）。',
+    m:['Forvia','延鋒（Yanfeng）','Grupo Antolin','豊田合成','河西工業']},
+  steeringWheel:{n:'ステアリングホイール（運転席エアバッグ）', e:'Steering wheel & driver airbag', s:'cabin',
+    r:'操舵の入力装置。中央に運転席エアバッグを内蔵します。',
+    h:'運転支援中に手が添えられているかを検知するセンサーや、ヒーターを内蔵するものもあります。',
+    m:['Autoliv','ZF','Joyson Safety Systems','豊田合成','インフレーター: ダイセル']},
+  curtainAirbag:{n:'カーテンエアバッグ', e:'Curtain airbag', s:'cabin',
+    r:'側面衝突や横転のとき、天井の縁から窓をおおうように展開して頭部を守ります。',
+    m:['Autoliv','ZF','Joyson Safety Systems','豊田合成','インフレーター: ダイセル']},
+
+  lv12:{n:'12 V補機バッテリー', e:'12 V auxiliary battery', s:'elec',
+    r:'ライト、ECU、ドアロックなど低電圧の機器に電気を送ります。高電圧系のリレーを閉じて車を起動させるのもこの電池の役目です。',
+    h:'走行中はDC-DCコンバーターで充電されます。これが上がると、駆動用電池が満タンでも車は起動できません。鉛電池からリチウムイオンへの置き換えも進んでいます（テスラは16 V系のリチウムイオン）。',
+    m:['GSユアサ','パナソニック エナジー','古河電池','Clarios（VARTA）','エナジーウィズ']},
+  ecu:{n:'統合ECU（セントラルコンピューター）', e:'Central compute / zone ECU', s:'elec',
+    r:'車両の各機能を制御するコンピューターです。',
+    h:'従来は機能ごとに数十～100個以上のECUが分散していましたが、ソフトウェア定義車両（SDV）では高性能な中央コンピューターと、車体の区画ごとのゾーンECUに集約し、OTA（無線アップデート）で機能を追加します。',
+    m:['デンソー','Bosch','AUMOVIO（旧Continental）','Aptiv','日立Astemo','Visteon','SoC: NVIDIA・Qualcomm・ルネサス・Mobileye']},
+  display:{n:'センターディスプレイ・メーター', e:'Center display & cluster', s:'elec',
+    r:'ナビ、オーディオ、空調、充電状況などを表示し、操作する画面です。',
+    h:'BEVでは充電スポットの検索や、到着時の電池残量の予測、充電前の電池の予熱の指示もここから行います。',
+    m:['パネル: LGディスプレイ・BOE・ジャパンディスプレイ・天馬・AUO','ユニット: デンソー・パナソニック オートモーティブシステムズ・Harman・Visteon・アルプスアルパイン']},
+  camera:{n:'前方カメラ（ADAS）', e:'Front ADAS camera', s:'elec',
+    r:'フロントガラスの上部から前方を撮影し、車線・車両・歩行者・標識を認識します。',
+    h:'自動ブレーキ、車線維持支援、追従走行（ACC）の目です。レーダーと組み合わせて精度を上げます（センサーフュージョン）。',
+    m:['Mobileye','デンソー','Bosch','ZF','Valeo','AUMOVIO','イメージセンサー: ソニー・onsemi・OmniVision']},
+  radar:{n:'ミリ波レーダー', e:'Front radar', s:'elec',
+    r:'電波を発射して、前方の車との距離と相対速度を測ります。',
+    h:'雨・霧・夜間に強いセンサーです。エンブレムやバンパーの裏に隠れていて、電波を通す素材のカバーを使います。',
+    v:'周波数 76–81 GHz帯', m:['デンソー','Bosch','AUMOVIO','Aptiv','ZF','Forvia HELLA','Valeo']},
+  headlamp:{n:'ヘッドランプ', e:'Headlamp', s:'elec',
+    r:'夜間に前方を照らします。',
+    h:'LEDが主流です。対向車の部分だけ光を遮り、常にハイビームで照らすアダプティブハイビーム（ADB）も普及しています。',
+    m:['小糸製作所','スタンレー電気','市光工業','Valeo','Forvia HELLA','Marelli','ZKW']},
+  taillamp:{n:'リアコンビネーションランプ', e:'Rear combination lamp', s:'elec',
+    r:'尾灯・ブレーキランプ・方向指示器・後退灯をまとめたランプです。',
+    h:'電動車は回生ブレーキだけで強く減速することがあるため、減速度が一定以上になるとペダルを踏まなくてもブレーキランプが点きます。',
+    m:['小糸製作所','スタンレー電気','市光工業','Valeo','Forvia HELLA','Marelli']},
+  avas:{n:'車両接近通報装置（AVAS）', e:'Acoustic vehicle alerting system', s:'elec',
+    r:'モーター走行の静かな車が、歩行者に接近を知らせるための音を出す装置です。',
+    h:'発進から時速20 km前後までと後退時に、自動で音を出します。日本・欧州・米国などで新型の電動車に義務づけられています（国連規則 R138）。',
+    m:['デンソー（グループ）','Forvia HELLA']},
+  tcu:{n:'通信ユニット・シャークフィンアンテナ', e:'Telematics unit & antenna', s:'elec',
+    r:'携帯電話網（LTE／5G）とGPSで、車をネットワークにつなぎます。',
+    h:'スマートフォンからのエアコン操作や充電状況の確認、緊急通報、ソフトウェアの無線アップデート（OTA）に使います。',
+    m:['デンソー','パナソニック オートモーティブシステムズ','LG電子','Harman','AUMOVIO','アンテナ: ヨコオ・原田工業']},
+};
+const CELLINFO = {
+  prismatic:{n:'バッテリーセル（角形）', e:'Prismatic cell',
+    r:'電気をためる最小単位。正極・負極・セパレーターを巻くか重ねて、電解液とともにアルミの缶に封入しています。',
+    h:'箱形なので隙間なく並べやすく、モジュールを省いてセルを直接パックに並べる「CTP（Cell to Pack）」と相性がよい形式です。BYDの「ブレードバッテリー」は細長いLFPの角形セルです。',
+    v:'セル電圧 約3.2 V（LFP）／約3.7 V（NMC）。400 V級は約96–108直列／このモデルは{N}セル',
+    m:['CATL','BYD（FinDreams）','プライムプラネットエナジー&ソリューションズ','Samsung SDI','CALB','Gotion']},
+  cylindrical:{n:'バッテリーセル（円筒形）', e:'Cylindrical cell',
+    r:'電気をためる最小単位。乾電池のような円筒形の缶に、帯状の電極を巻いて封入しています。',
+    h:'量産性と放熱性にすぐれ、1台に数千本を並べます。直径21×高さ70 mmの「2170」や、直径46 mmの大型「4680」があり、テスラが代表的な採用例です。断面では蜂の巣のような円の並びが見えます。',
+    v:'2170: 直径21 × 高さ70 mm・約3.6 V／このモデルは{N}本',
+    m:['パナソニック エナジー','LGエナジーソリューション','Samsung SDI','テスラ（4680を内製）','EVE Energy']},
+  pouch:{n:'バッテリーセル（ラミネート）', e:'Pouch cell',
+    r:'電気をためる最小単位。アルミラミネートフィルムで電極を封じた、薄い袋状のセルです。',
+    h:'軽く、形の自由度が高いのが特長です。充放電で膨らむのを抑えるため、モジュールで両側から押さえて使います。初代の日産リーフなどが採用しました。',
+    v:'厚さ 約8–15 mm／約3.7 V（NMC）／このモデルは{N}セル',
+    m:['LGエナジーソリューション','SK On','AESC']},
+};
+
+/* ======================================================================
+   Renderer, scene, camera
+   ====================================================================== */
+const stage = $('#stage');
+const canvas = $('#gl');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
+} catch (err) {
+  $('#loading').textContent = 'このブラウザではWebGLを使えないため、3D表示ができません。';
+  return;
+}
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+renderer.setPixelRatio(DPR);
+renderer.localClippingEnabled = true;
+const css = getComputedStyle(document.documentElement);
+const tok = n => css.getPropertyValue(n).trim();
+renderer.setClearColor(new THREE.Color(tok('--well') || '#05080a'), 1);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 80);
+camera.position.set(5.6, 3.1, 6.0);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.09;
+controls.screenSpacePanning = true;
+controls.minDistance = 0.8;
+controls.maxDistance = 18;
+controls.target.set(0, 0.55, 0);
+controls.update();
+
+scene.add(new THREE.HemisphereLight(0xdfe8f5, 0x161c20, 0.55));
+const keyL = new THREE.DirectionalLight(0xffffff, 0.62); keyL.position.set(4, 7, 5); scene.add(keyL);
+const fillL = new THREE.DirectionalLight(0xbfd2ff, 0.26); fillL.position.set(-5, 3, -4); scene.add(fillL);
+const rimL = new THREE.DirectionalLight(0xffffff, 0.16); rimL.position.set(-2, -3, 4); scene.add(rimL);
+
+// floor grid: 500 mm major, 100 mm minor
+const gridMajor = new THREE.GridHelper(6, 12, 0x34505c, 0x223640);
+gridMajor.material.transparent = true; gridMajor.material.opacity = 0.75;
+const gridMinor = new THREE.GridHelper(6, 60, 0x16242b, 0x16242b);
+gridMinor.material.transparent = true; gridMinor.material.opacity = 0.5;
+gridMinor.position.y = -0.001;
+scene.add(gridMinor, gridMajor);
+
+/* ======================================================================
+   Clipping: 6 planes = X/Y/Z, both ends
+   ====================================================================== */
+const AXC = {x:tok('--ax-x')||'#ff6f61', y:tok('--ax-y')||'#5dd28b', z:tok('--ax-z')||'#5ea8ff'};
+const AX = {
+  x:{name:'前後', plane:'横断面（輪切り）', min:-2400, max:2400, lo:-2400, hi:2400, slab:false, c:0, th:100},
+  y:{name:'左右', plane:'縦断面（サジタル）', min:-1000, max:1000, lo:-1000, hi:1000, slab:false, c:0, th:100},
+  z:{name:'上下', plane:'水平断面', min:0, max:1600, lo:0, hi:1600, slab:false, c:600, th:100},
+};
+const planes = [
+  new THREE.Plane(new THREE.Vector3(1,0,0), 99), new THREE.Plane(new THREE.Vector3(-1,0,0), 99),
+  new THREE.Plane(new THREE.Vector3(0,0,-1), 99), new THREE.Plane(new THREE.Vector3(0,0,1), 99),
+  new THREE.Plane(new THREE.Vector3(0,1,0), 99), new THREE.Plane(new THREE.Vector3(0,-1,0), 99),
+];
+function axRange(k){ const a = AX[k]; return a.slab ? [a.c - a.th/2, a.c + a.th/2] : [a.lo, a.hi]; }
+function axActive(k){ const a = AX[k], r = axRange(k); return [r[0] > a.min, r[1] < a.max]; }
+function updatePlanes(){
+  for (const [i,k] of [[0,'x'],[2,'y'],[4,'z']]) {
+    const r = axRange(k), act = axActive(k);
+    planes[i].constant = act[0] ? -r[0]/1000 : 99;
+    planes[i+1].constant = act[1] ? r[1]/1000 : 99;
+  }
+  updateHelpers();
+}
+// plane helpers (CT positioning lasers)
+const helpers = [];
+(function makeHelpers(){
+  const defs = [
+    {k:'x', i:0, w:2.1, h:1.75, setup:m=>{m.rotation.y = Math.PI/2;}},
+    {k:'x', i:1, w:2.1, h:1.75, setup:m=>{m.rotation.y = Math.PI/2;}},
+    {k:'y', i:2, w:5.0, h:1.75, setup:()=>{}},
+    {k:'y', i:3, w:5.0, h:1.75, setup:()=>{}},
+    {k:'z', i:4, w:5.0, h:2.1, setup:m=>{m.rotation.x = -Math.PI/2;}},
+    {k:'z', i:5, w:5.0, h:2.1, setup:m=>{m.rotation.x = -Math.PI/2;}},
+  ];
+  for (const d of defs) {
+    const g = new THREE.Group();
+    const geo = new THREE.PlaneGeometry(d.w, d.h);
+    const col = new THREE.Color(AXC[d.k]);
+    const fill = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0.05, side:THREE.DoubleSide, depthWrite:false}));
+    const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({color:col, transparent:true, opacity:0.55}));
+    g.add(fill, edge); d.setup(g); g.visible = false; g.renderOrder = 5;
+    scene.add(g); helpers.push({...d, g, fill, edge});
+  }
+})();
+let laserFlash = {k:null, until:0};
+function updateHelpers(){
+  for (const h of helpers) {
+    const r = axRange(h.k), act = axActive(h.k)[h.i % 2];
+    h.g.visible = act;
+    const v = (h.i % 2 ? r[1] : r[0]) / 1000;
+    if (h.k === 'x') h.g.position.set(v, 0.85, 0);
+    if (h.k === 'y') h.g.position.set(0, 0.85, -v);
+    if (h.k === 'z') h.g.position.set(0, v, 0);
+    const hot = laserFlash.k === h.k && performance.now() < laserFlash.until;
+    h.fill.material.opacity = hot ? 0.12 : 0.04;
+    h.edge.material.opacity = hot ? 0.95 : 0.5;
+  }
+}
+const insideClip = p => planes.every(pl => pl.distanceToPoint(p) >= -1e-4);
+
+/* ======================================================================
+   Materials: solid (with hatched section caps) and X-ray
+   ====================================================================== */
+const HATCH = {value: 7 * DPR};
+const WHITE = new THREE.Color(1,1,1), BLACK = new THREE.Color(0,0,0);
+const ACC = new THREE.Color(tok('--accent') || '#f2b84b');
+const REAL = {paint:0x3f5d7c, steel:0x8f989f, alu:0xbcc3c9, dark:0x454b51, rubber:0x222528, black:0x2d3135, copper:0xc27c47, hv:0xff7a1a,
+  cell:0x6b889a, fabric:0x4a5058, glass:0xa8cadb, red:0xb3362d, amber:0xe0a040, pcb:0x2f7052, coolant:0x3d97a8, iron:0x60666a, white:0xd5dadd, fuel:0xc9a33a, magnet:0x7d8aa0, spring:0xc23a30};
+
+function capPatch(m){
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uCap = m.userData.uCap;
+    sh.uniforms.uCapOn = m.userData.uCapOn;
+    sh.uniforms.uHatch = HATCH;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uCap;\nuniform float uCapOn;\nuniform float uHatch;')
+      .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  if (uCapOn > 0.5 && !gl_FrontFacing) {\n    float d = mod(gl_FragCoord.x + gl_FragCoord.y, uHatch);\n    float h = 1.0 - step(uHatch * 0.2, d);\n    gl_FragColor = vec4(mix(uCap, uCap * 0.4, h), 1.0);\n  }');
+  };
+}
+const XVS = `
+#include <common>
+#include <clipping_planes_pars_vertex>
+varying vec3 vN; varying vec3 vV;
+void main(){
+  #include <beginnormal_vertex>
+  #include <defaultnormal_vertex>
+  #include <begin_vertex>
+  #include <project_vertex>
+  #include <clipping_planes_vertex>
+  vN = normalize(transformedNormal);
+  vV = normalize(-mvPosition.xyz);
+}`;
+const XFS = `
+#include <common>
+#include <clipping_planes_pars_fragment>
+uniform vec3 uColor; uniform float uStrength;
+varying vec3 vN; varying vec3 vV;
+void main(){
+  #include <clipping_planes_fragment>
+  float f = 1.0 - abs(dot(normalize(vN), normalize(vV)));
+  float a = (0.045 + pow(f, 2.2) * 0.5) * uStrength;
+  gl_FragColor = vec4(uColor * a, 1.0);
+}`;
+
+/* ======================================================================
+   Part registry & geometry helpers
+   ====================================================================== */
+const root = new THREE.Group(); scene.add(root);
+let parts = new Map();
+let matCache = new Map();
+let asmList = [];
+let pickables = [];
+
+function partRec(id){
+  let p = parts.get(id);
+  if (!p) {
+    const info = INFO[id];
+    if (!info) throw new Error('missing info: ' + id);
+    p = {id, info, sys:info.s, group:new THREE.Group(), meshes:[], mats:[], xray:null};
+    p.xray = new THREE.ShaderMaterial({uniforms:{uColor:{value:new THREE.Color()}, uStrength:{value:1}}, vertexShader:XVS, fragmentShader:XFS,
+      transparent:true, depthWrite:false, depthTest:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide, clipping:true, clippingPlanes:planes});
+    root.add(p.group); parts.set(id, p);
+  }
+  return p;
+}
+function asm(id, center){ const g = new THREE.Group(); partRec(id).group.add(g); g.userData.center = center || null; asmList.push(g); return g; }
+function getMat(id, o){
+  const key = [id, o.tone || 0, o.real == null ? '' : o.real, o.glass ? 1 : 0, o.cap === false ? 0 : 1, o.metal ? 1 : 0].join('|');
+  let m = matCache.get(key);
+  if (m) return m;
+  m = new THREE.MeshStandardMaterial({roughness: o.glass ? 0.08 : (o.metal ? 0.38 : 0.62), metalness: o.metal ? 0.35 : 0.06, side:THREE.DoubleSide, clippingPlanes:planes});
+  m.userData = {tone:o.tone || 0, real:o.real, glass:!!o.glass, cap:o.cap !== false, uCap:{value:new THREE.Color()}, uCapOn:{value:1}};
+  if (m.userData.cap && !o.glass) capPatch(m);
+  matCache.set(key, m); partRec(id).mats.push(m);
+  return m;
+}
+function add(id, geo, o = {}, parent = null){
+  const p = partRec(id);
+  const m = new THREE.Mesh(geo, getMat(id, o));
+  m.userData.partId = id; m.userData.solid = m.material;
+  (parent || asm(id)).add(m);
+  p.meshes.push(m); pickables.push(m);
+  return m;
+}
+function addInst(id, geo, matrices, o = {}, parent = null){
+  const p = partRec(id);
+  const m = new THREE.InstancedMesh(geo, getMat(id, o), matrices.length);
+  matrices.forEach((mx, i) => m.setMatrixAt(i, mx));
+  m.instanceMatrix.needsUpdate = true; m.frustumCulled = false;
+  m.userData.partId = id; m.userData.solid = m.material;
+  (parent || asm(id)).add(m);
+  p.meshes.push(m); pickables.push(m);
+  return m;
+}
+const V = (x,y,z) => new THREE.Vector3(x,y,z);
+const smooth = (a,b,x) => { const t = Math.min(1, Math.max(0, (x-a)/(b-a))); return t*t*(3-2*t); };
+const lerpV = (a,b,t) => a.clone().lerp(b, t);
+
+function boxAt(id, x0,x1,y0,y1,z0,z1, o, parent){
+  const g = new THREE.BoxGeometry(Math.abs(x1-x0), Math.abs(y1-y0), Math.abs(z1-z0));
+  g.translate((x0+x1)/2, (y0+y1)/2, (z0+z1)/2);
+  return add(id, g, o, parent);
+}
+function shellBox(id, x0,x1,y0,y1,z0,z1,t, o, parent, openTop){
+  const g = parent || asm(id);
+  boxAt(id, x0,x1,y0,y0+t,z0,z1,o,g);
+  if (!openTop) boxAt(id, x0,x1,y1-t,y1,z0,z1,o,g);
+  boxAt(id, x0,x0+t,y0+t,y1-(openTop?0:t),z0,z1,o,g);
+  boxAt(id, x1-t,x1,y0+t,y1-(openTop?0:t),z0,z1,o,g);
+  boxAt(id, x0+t,x1-t,y0+t,y1-(openTop?0:t),z0,z0+t,o,g);
+  boxAt(id, x0+t,x1-t,y0+t,y1-(openTop?0:t),z1-t,z1,o,g);
+  return g;
+}
+function cylG(axis, r, a0, a1, u, v, seg = 24, r2){
+  const L = Math.abs(a1 - a0), mid = (a0 + a1) / 2;
+  const g = new THREE.CylinderGeometry(r2 == null ? r : r2, r, L, seg);
+  if (axis === 'x') { g.rotateZ(-Math.PI/2); g.translate(mid, u, v); }
+  else if (axis === 'z') { g.rotateX(Math.PI/2); g.translate(u, v, mid); }
+  else g.translate(u, mid, v);
+  return g;
+}
+function cyl(id, axis, r, a0, a1, u, v, o, parent, seg){ return add(id, cylG(axis, r, a0, a1, u, v, seg), o, parent); }
+function rodG(a, b, r, seg = 10){
+  const d = b.clone().sub(a), L = d.length();
+  const g = new THREE.CylinderGeometry(r, r, L, seg); g.translate(0, L/2, 0);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0,1,0), d.normalize()));
+  g.translate(a.x, a.y, a.z); return g;
+}
+function rod(id, a, b, r, o, parent, seg){ return add(id, rodG(a, b, r, seg), o, parent); }
+function alignZ(g, a, b){
+  const d = b.clone().sub(a);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0,0,1), d.normalize()));
+  g.translate(a.x, a.y, a.z); return g;
+}
+function rectPath(cls, x, y, w, h){ const p = new cls(); p.moveTo(x,y); p.lineTo(x+w,y); p.lineTo(x+w,y+h); p.lineTo(x,y+h); p.closePath(); return p; }
+// hollow (closed-section) beam between two points; ribs: 0 none, 1 vertical web, 2 cross
+function beamG(a, b, w, h, t, ribs = 0){
+  const L = b.clone().sub(a).length();
+  const s = rectPath(THREE.Shape, -w/2, -h/2, w, h);
+  const iw = w - 2*t, ih = h - 2*t;
+  if (ribs === 0) s.holes.push(rectPath(THREE.Path, -iw/2, -ih/2, iw, ih));
+  else if (ribs === 1) { const cw = (iw - t)/2; s.holes.push(rectPath(THREE.Path, -iw/2, -ih/2, cw, ih), rectPath(THREE.Path, t/2, -ih/2, cw, ih)); }
+  else { const cw = (iw - t)/2, ch = (ih - t)/2;
+    s.holes.push(rectPath(THREE.Path, -iw/2, -ih/2, cw, ch), rectPath(THREE.Path, t/2, -ih/2, cw, ch), rectPath(THREE.Path, -iw/2, t/2, cw, ch), rectPath(THREE.Path, t/2, t/2, cw, ch)); }
+  const g = new THREE.ExtrudeGeometry(s, {depth:L, bevelEnabled:false, steps:1});
+  return alignZ(g, a, b);
+}
+function beam(id, a, b, w, h, t, o, parent, ribs){ return add(id, beamG(a, b, w, h, t, ribs), o, parent); }
+function barG(a, b, w, h){ const L = b.clone().sub(a).length(); const g = new THREE.BoxGeometry(w, h, L); g.translate(0, 0, L/2); return alignZ(g, a, b); }
+function bar(id, a, b, w, h, o, parent){ return add(id, barG(a, b, w, h), o, parent); }
+function tubeG(pts, r, seg = 64, rs = 8){
+  const c = new THREE.CatmullRomCurve3(pts.map(p => Array.isArray(p) ? V(...p) : p), false, 'centripetal');
+  return new THREE.TubeGeometry(c, seg, r, rs, false);
+}
+function tube(id, pts, r, o, parent, seg){ return add(id, tubeG(pts, r, seg), o, parent); }
+function helixG(a, b, R, turns, r){
+  const ax = b.clone().sub(a), L = ax.length(); ax.normalize();
+  const u = Math.abs(ax.y) < 0.9 ? V(0,1,0).cross(ax).normalize() : V(1,0,0).cross(ax).normalize();
+  const w = ax.clone().cross(u).normalize();
+  const pts = [], N = Math.ceil(turns * 20);
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, ph = t * turns * TAU;
+    pts.push(a.clone().addScaledVector(ax, t*L).addScaledVector(u, Math.cos(ph)*R).addScaledVector(w, Math.sin(ph)*R));
+  }
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), N*2, r, 6, false);
+}
+function circleShape(r, cx = 0, cy = 0){ const s = new THREE.Shape(); s.absarc(cx, cy, r, 0, TAU, false); return s; }
+function holeCircle(r, cx = 0, cy = 0){ const p = new THREE.Path(); p.absarc(cx, cy, r, 0, TAU, true); return p; }
+function extrudeZ(shape, len, cs = 16){ const g = new THREE.ExtrudeGeometry(shape, {depth:len, bevelEnabled:false, curveSegments:cs}); g.translate(0, 0, -len/2); return g; }
+function annulusG(ro, ri, len, cs = 24){ const s = circleShape(ro); if (ri > 0) s.holes.push(holeCircle(ri)); return extrudeZ(s, len, cs); }
+function gearShape(r, teeth, hole = 0){
+  const s = new THREE.Shape(), n = teeth * 4, rr = r * (1 - Math.min(0.14, 2.2 / teeth));
+  for (let i = 0; i < n; i++) {
+    const a = i / n * TAU, k = i % 4, rad = (k === 1 || k === 2) ? r : rr;
+    const x = Math.cos(a) * rad, y = Math.sin(a) * rad;
+    if (i) s.lineTo(x, y); else s.moveTo(x, y);
+  }
+  s.closePath();
+  if (hole) s.holes.push(holeCircle(hole));
+  return s;
+}
+function gearG(r, teeth, len, hole){ return extrudeZ(gearShape(r, teeth, hole), len, 6); }
+function roundRectShape(x0, y0, x1, y1, r, cls = THREE.Shape){
+  const s = new cls();
+  s.moveTo(x0 + r, y0); s.lineTo(x1 - r, y0); s.quadraticCurveTo(x1, y0, x1, y0 + r);
+  s.lineTo(x1, y1 - r); s.quadraticCurveTo(x1, y1, x1 - r, y1);
+  s.lineTo(x0 + r, y1); s.quadraticCurveTo(x0, y1, x0, y1 - r);
+  s.lineTo(x0, y0 + r); s.quadraticCurveTo(x0, y0, x0 + r, y0);
+  return s;
+}
+// closed housing: rounded-rect section ring in X-Y, extruded along Z between z0..z1, with end plates
+function housingZ(id, x0, x1, y0, y1, z0, z1, t, rad, o, parent){
+  const g = parent || asm(id);
+  const s = roundRectShape(x0, y0, x1, y1, rad);
+  s.holes.push(roundRectShape(x0 + t, y0 + t, x1 - t, y1 - t, Math.max(0.005, rad - t), THREE.Path));
+  const ring = new THREE.ExtrudeGeometry(s, {depth:z1 - z0 - 2*t, bevelEnabled:false, curveSegments:6}); ring.translate(0, 0, z0 + t);
+  add(id, ring, o, g);
+  for (const zz of [z0, z1 - t]) {
+    const p = new THREE.ExtrudeGeometry(roundRectShape(x0, y0, x1, y1, rad), {depth:t, bevelEnabled:false, curveSegments:6}); p.translate(0, 0, zz);
+    add(id, p, o, g);
+  }
+  return g;
+}
+
+/* ======================================================================
+   Vehicle constants (metres; three.js axes: x = forward, y = up, z = right)
+   ====================================================================== */
+const HW = 0.92, FA = 1.375, RA = -1.375, WR = 0.335, TW = 0.79;
+
+/* ---------- exterior body ---------- */
+const PROFILE = {
+  frontFascia:[[2.27,0.20],[2.335,0.30],[2.34,0.50],[2.27,0.69]],
+  hood:[[2.25,0.71],[2.06,0.79],[1.55,0.885],[0.97,0.955]],
+  windshield:[[0.94,0.965],[0.62,1.17],[0.27,1.395]],
+  roof:[[0.24,1.405],[-0.15,1.465],[-0.75,1.47],[-1.24,1.405]],
+  rearGlass:[[-1.27,1.39],[-1.62,1.215],[-1.94,1.07]],
+  trunk:[[-1.96,1.06],[-2.13,1.05],[-2.255,1.005]],
+  rearFascia:[[-2.27,0.985],[-2.30,0.78],[-2.295,0.46],[-2.22,0.21]],
+};
+const DLO = [
+  [[0.76,1.005],[0.30,1.31],[0.06,1.385],[-0.17,1.397],[-0.17,1.005]],
+  [[-0.30,1.005],[-0.30,1.397],[-0.78,1.397],[-1.14,1.347],[-1.47,1.045]],
+];
+function sampleSeg(c, step = 0.03){
+  const curve = new THREE.CatmullRomCurve3(c.map(p => V(p[0], p[1], 0)), false, 'centripetal');
+  const N = Math.max(4, Math.ceil(curve.getLength() / step));
+  return curve.getSpacedPoints(N).map(v => [v.x, v.y]);
+}
+function stripShape(pts, t){
+  const n = pts.length, inner = [];
+  for (let i = 0; i < n; i++) {
+    const a = pts[Math.max(0, i-1)], b = pts[Math.min(n-1, i+1)];
+    let tx = b[0]-a[0], ty = b[1]-a[1]; const l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
+    inner.push([pts[i][0] - ty*t, pts[i][1] + tx*t]);
+  }
+  const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < n; i++) s.lineTo(pts[i][0], pts[i][1]);
+  for (let i = n-1; i >= 0; i--) s.lineTo(inner[i][0], inner[i][1]);
+  s.closePath(); return s;
+}
+function deformBody(g){
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), zn = z / HW;
+    const th = smooth(0.97, 1.47, y);
+    const e = x > 0 ? smooth(1.45, 2.34, x) : smooth(1.5, 2.30, -x);
+    let s = (1 - 0.15*th) * (1 - 0.06*e) * (1 - 0.025*(1 - smooth(0.2, 0.42, y)));
+    p.setXYZ(i, x - Math.sign(x) * 0.17 * Math.pow(e, 1.5) * zn*zn, y, z * s);
+  }
+  p.needsUpdate = true; g.computeVertexNormals(); return g;
+}
+function bottomLine(){
+  const pts = [[-2.10, 0.205]];
+  const arch = cx => { const R = 0.40, cy = WR, y0 = 0.20, dy = y0 - cy, dx = Math.sqrt(R*R - dy*dy);
+    const A0 = Math.atan2(dy, -dx) + TAU, A1 = Math.atan2(dy, dx);
+    for (let i = 0; i <= 28; i++) { const a = A0 + (A1 - A0) * i/28; pts.push([cx + R*Math.cos(a), cy + R*Math.sin(a)]); } };
+  arch(RA); arch(FA); pts.push([2.16, 0.20]);
+  return pts;
+}
+function buildExterior(){
+  const segs = {}; for (const k in PROFILE) segs[k] = sampleSeg(PROFILE[k]);
+  const T = 0.016, SIDE = 0.018, depth = 2*HW - 2*SIDE + 0.004;
+  const strip = (k, id, o) => { const g = new THREE.ExtrudeGeometry(stripShape(segs[k], T), {depth, steps:14, bevelEnabled:false}); g.translate(0, 0, -depth/2); return add(id, deformBody(g), o); };
+  strip('frontFascia', 'bumpers', {tone:-0.05, real:REAL.paint});
+  strip('rearFascia', 'bumpers', {tone:-0.05, real:REAL.paint});
+  strip('hood', 'hood', {real:REAL.paint});
+  strip('roof', 'roof', {real:REAL.paint});
+  strip('trunk', 'trunk', {real:REAL.paint});
+  strip('windshield', 'glass', {glass:true, real:REAL.glass});
+  strip('rearGlass', 'glass', {glass:true, real:REAL.glass});
+  const outline = [].concat(segs.frontFascia, segs.hood, segs.windshield, segs.roof, segs.rearGlass, segs.trunk, segs.rearFascia, bottomLine());
+  const shape = new THREE.Shape(outline.map(p => new THREE.Vector2(p[0], p[1])));
+  DLO.forEach(w => shape.holes.push(new THREE.Path(w.map(p => new THREE.Vector2(p[0], p[1])))));
+  for (const sd of [1, -1]) {
+    const g = new THREE.ExtrudeGeometry(shape, {depth:SIDE, bevelEnabled:false, curveSegments:2});
+    g.translate(0, 0, sd > 0 ? HW - SIDE : -HW);
+    add('bodyside', deformBody(g), {real:REAL.paint});
+    DLO.forEach(w => {
+      const gs = new THREE.ExtrudeGeometry(new THREE.Shape(w.map(p => new THREE.Vector2(p[0], p[1]))), {depth:0.005, bevelEnabled:false});
+      gs.translate(0, 0, sd*(HW - 0.009) - 0.0025);
+      add('glass', deformBody(gs), {glass:true, real:REAL.glass});
+    });
+  }
+}
+
+/* ---------- body-in-white ---------- */
+function buildBIW(T){
+  const fy = TYPES[T].floor, kx = TYPES[T].kick, ry = TYPES[T].rear, t = 0.012, zw = 0.79;
+  boxAt('floor', kx, 0.93, fy - t, fy, -zw, zw, {real:REAL.steel});
+  boxAt('floor', kx - t, kx, fy - t, ry, -zw, zw, {real:REAL.steel});
+  boxAt('floor', -2.17, kx, ry - t, ry, -0.80, 0.80, {real:REAL.steel});
+  const dg = asm('dash');
+  boxAt('dash', 0.933, 0.947, fy - t, 0.95, -0.84, 0.84, {real:REAL.steel}, dg);
+  beam('dash', V(0.95, 0.93, -0.84), V(0.95, 0.93, 0.84), 0.06, 0.05, 0.004, {real:REAL.steel, tone:0.1}, dg);
+  for (const sd of [1, -1]) {
+    beam('sill', V(0.97, 0.285, sd*0.845), V(-0.99, 0.285, sd*0.845), 0.12, 0.17, 0.01, {real:REAL.steel}, null, T === 'bev' ? 2 : 0);
+    const fm = asm('frontMember');
+    beam('frontMember', V(0.94, 0.50, sd*0.56), V(2.06, 0.50, sd*0.56), 0.08, 0.12, 0.007, {real:REAL.steel}, fm);
+    beam('frontMember', V(2.06, 0.50, sd*0.56), V(2.165, 0.50, sd*0.56), 0.09, 0.10, 0.004, {real:REAL.alu, tone:0.2}, fm);
+    const rm = asm('rearMember');
+    beam('rearMember', V(kx - 0.01, 0.53, sd*0.56), V(-2.04, 0.53, sd*0.56), 0.08, 0.10, 0.007, {real:REAL.steel}, rm);
+    beam('rearMember', V(-2.04, 0.53, sd*0.56), V(-2.135, 0.53, sd*0.56), 0.09, 0.09, 0.004, {real:REAL.alu, tone:0.2}, rm);
+    beam('bpillar', V(-0.235, 0.36, sd*0.885), V(-0.235, 1.40, sd*0.79), 0.11, 0.035, 0.004, {real:REAL.steel, tone:-0.1});
+    for (const ax of [FA, RA]) {
+      const gl = new THREE.CylinderGeometry(0.40, 0.40, 0.30, 32, 1, true, Math.PI - 1.95, 3.9);
+      gl.rotateX(Math.PI/2); gl.translate(ax, WR, sd*0.775);
+      add('wheelhouse', gl, {cap:false, tone:-0.25, real:REAL.black});
+    }
+  }
+  beam('bumperBeam', V(2.19, 0.47, -0.70), V(2.19, 0.47, 0.70), 0.04, 0.10, 0.004, {real:REAL.alu}, null, 1);
+  beam('bumperBeam', V(-2.155, 0.50, -0.70), V(-2.155, 0.50, 0.70), 0.04, 0.10, 0.004, {real:REAL.alu}, null, 1);
+  for (const cx of [0.16, -0.30]) beam('crossMember', V(cx, fy + 0.03, -0.78), V(cx, fy + 0.03, 0.78), 0.07, 0.05, 0.005, {real:REAL.steel, tone:0.1});
+}
+
+/* ---------- chassis ---------- */
+function tireGeo(){
+  let P = [[0.233,0.106],[0.262,0.116],[0.300,0.118],[0.322,0.110],[0.333,0.094],[0.336,0.06],[0.336,-0.06],[0.333,-0.094],[0.322,-0.110],[0.300,-0.118],[0.262,-0.116],[0.233,-0.106],
+    [0.237,-0.094],[0.262,-0.103],[0.298,-0.105],[0.314,-0.097],[0.321,-0.08],[0.322,-0.05],[0.322,0.05],[0.321,0.08],[0.314,0.097],[0.298,0.105],[0.262,0.103],[0.237,0.094]];
+  let area = 0; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i+1) % P.length]; area += a[0]*b[1] - b[0]*a[1]; }
+  if (area < 0) P = P.reverse();
+  P.push(P[0]);
+  const g = new THREE.LatheGeometry(P.map(p => new THREE.Vector2(p[0], p[1])), 56);
+  g.rotateX(Math.PI/2); return g;
+}
+function buildWheels(){
+  const tg = tireGeo();
+  const barrel = annulusG(0.224, 0.212, 0.20, 32), flange = annulusG(0.238, 0.212, 0.012, 32);
+  for (const ax of [FA, RA]) for (const sd of [1, -1]) {
+    const front = ax > 0;
+    const gT = asm('tire'); gT.position.set(ax, WR, sd*TW); add('tire', tg, {tone:-0.3, real:REAL.rubber}, gT);
+    const gW = asm('wheel'); gW.position.set(ax, WR, sd*TW); gW.scale.z = sd;
+    add('wheel', barrel, {real:REAL.alu, metal:true}, gW);
+    for (const f of [-0.104, 0.104]) { const m = add('wheel', flange, {real:REAL.alu, metal:true}, gW); m.position.z = f; }
+    add('wheel', cylG('z', 0.075, 0.035, 0.085, 0, 0, 24), {real:REAL.alu, metal:true, tone:0.1}, gW);
+    for (let i = 0; i < 5; i++) { const a = i / 5 * TAU + 0.3; const s = barG(V(Math.cos(a)*0.07, Math.sin(a)*0.07, 0.065), V(Math.cos(a)*0.214, Math.sin(a)*0.214, 0.072), 0.045, 0.03); add('wheel', s, {real:REAL.alu, metal:true, tone:0.1}, gW); }
+    const gD = asm('brakeDisc'); gD.position.set(ax, WR, sd*(TW - 0.055)); gD.scale.z = sd;
+    const dr = front ? 0.165 : 0.150;
+    for (const f of [-0.009, 0.009]) { const m = add('brakeDisc', annulusG(dr, 0.088, 0.009, 32), {real:REAL.iron, metal:true}, gD); m.position.z = f; }
+    add('brakeDisc', annulusG(0.09, 0.03, 0.045, 24), {real:REAL.iron, metal:true, tone:0.1}, gD).position.z = 0.03;
+    const gC = asm('caliper'); gC.position.set(ax, WR, sd*(TW - 0.055));
+    const ca = 2.75, cr = dr - 0.02;
+    const cg = new THREE.BoxGeometry(0.075, 0.11, 0.06); cg.rotateZ(ca - Math.PI/2); cg.translate(Math.cos(ca)*cr, Math.sin(ca)*cr, 0);
+    add('caliper', cg, {real:REAL.red}, gC);
+    const gH = asm('hub');
+    add('hub', cylG('z', 0.055, sd*(TW - 0.135), sd*(TW - 0.07), ax, WR, 20), {real:REAL.steel, metal:true}, gH);
+    boxAt('hub', ax - 0.035, ax + 0.035, WR - 0.13, WR + 0.12, sd*(TW - 0.15), sd*(TW - 0.115), {real:REAL.iron, tone:-0.1}, gH);
+  }
+}
+function buildSuspension(){
+  for (const sd of [1, -1]) {
+    // front MacPherson strut
+    const g = asm('frontSusp');
+    const lo = V(FA, 0.30, sd*0.66), hi = V(FA - 0.03, 0.84, sd*0.59);
+    rod('frontSusp', lo, lerpV(lo, hi, 0.62), 0.028, {real:REAL.dark}, g, 16);
+    rod('frontSusp', lerpV(lo, hi, 0.58), hi, 0.011, {real:REAL.steel, tone:0.25}, g);
+    add('frontSusp', helixG(lerpV(lo, hi, 0.46), lerpV(lo, hi, 0.95), 0.07, 5, 0.0085), {real:REAL.spring, tone:0.25}, g);
+    rod('frontSusp', lerpV(lo, hi, 0.445), lerpV(lo, hi, 0.47), 0.085, {real:REAL.steel}, g, 24);
+    rod('frontSusp', lerpV(lo, hi, 0.95), hi, 0.075, {real:REAL.rubber, tone:-0.2}, g, 24);
+    rod('frontSusp', V(FA, 0.21, sd*0.67), V(FA + 0.12, 0.20, sd*0.42), 0.018, {real:REAL.steel}, g);
+    rod('frontSusp', V(FA, 0.21, sd*0.67), V(FA - 0.30, 0.20, sd*0.42), 0.018, {real:REAL.steel}, g);
+    // rear multi-link
+    const r = asm('rearSusp');
+    const rlo = V(RA - 0.13, 0.24, sd*0.63), rhi = V(RA - 0.16, 0.66, sd*0.60);
+    rod('rearSusp', rlo, lerpV(rlo, rhi, 0.65), 0.025, {real:REAL.dark}, r, 16);
+    rod('rearSusp', lerpV(rlo, rhi, 0.6), rhi, 0.01, {real:REAL.steel, tone:0.25}, r);
+    add('rearSusp', helixG(V(RA, 0.255, sd*0.55), V(RA, 0.47, sd*0.55), 0.06, 4, 0.0085), {real:REAL.spring, tone:0.25}, r);
+    bar('rearSusp', V(RA - 0.02, 0.22, sd*0.68), V(RA + 0.02, 0.245, sd*0.40), 0.10, 0.025, {real:REAL.steel}, r);
+    rod('rearSusp', V(RA + 0.06, 0.45, sd*0.64), V(RA + 0.03, 0.44, sd*0.38), 0.013, {real:REAL.steel}, r);
+    rod('rearSusp', V(RA - 0.08, 0.45, sd*0.64), V(RA - 0.10, 0.44, sd*0.40), 0.013, {real:REAL.steel}, r);
+    rod('rearSusp', V(RA + 0.13, 0.30, sd*0.66), V(RA + 0.15, 0.28, sd*0.40), 0.011, {real:REAL.steel}, r);
+  }
+  tube('frontSusp', [[FA, 0.31, -0.63],[FA - 0.20, 0.27, -0.50],[FA - 0.25, 0.27, 0],[FA - 0.20, 0.27, 0.50],[FA, 0.31, 0.63]], 0.012, {real:REAL.dark}, null, 48);
+  // subframes
+  const fs = asm('frontSubframe');
+  for (const sd of [1, -1]) beam('frontSubframe', V(FA + 0.28, 0.19, sd*0.42), V(FA - 0.38, 0.19, sd*0.42), 0.07, 0.06, 0.006, {real:REAL.steel, tone:-0.05}, fs);
+  for (const cx of [FA + 0.28, FA - 0.38]) beam('frontSubframe', V(cx, 0.19, -0.455), V(cx, 0.19, 0.455), 0.07, 0.06, 0.006, {real:REAL.steel, tone:-0.05}, fs);
+  const rs = asm('rearSubframe');
+  for (const sd of [1, -1]) beam('rearSubframe', V(RA + 0.33, 0.27, sd*0.45), V(RA - 0.28, 0.27, sd*0.45), 0.07, 0.06, 0.006, {real:REAL.steel, tone:-0.05}, rs);
+  for (const cx of [RA + 0.33, RA - 0.28]) beam('rearSubframe', V(cx, 0.27, -0.485), V(cx, 0.27, 0.485), 0.07, 0.06, 0.006, {real:REAL.steel, tone:-0.05}, rs);
+}
+function buildSteeringBrakes(){
+  const g = asm('steeringRack');
+  cyl('steeringRack', 'z', 0.028, -0.42, 0.42, 1.205, 0.30, {real:REAL.alu}, g, 16);
+  cyl('steeringRack', 'z', 0.045, 0.12, 0.30, 1.285, 0.30, {real:REAL.dark, tone:0.1}, g, 20);
+  for (const sd of [1, -1]) rod('steeringRack', V(1.205, 0.30, sd*0.42), V(1.235, 0.31, sd*0.655), 0.012, {real:REAL.steel}, g);
+  rod('steeringRack', V(1.205, 0.31, 0.30), V(0.72, 0.76, 0.37), 0.013, {real:REAL.steel}, g);
+  rod('steeringRack', V(0.72, 0.76, 0.37), V(0.40, 0.887, 0.37), 0.024, {real:REAL.dark}, g, 14);
+  const b = asm('brakeUnit');
+  boxAt('brakeUnit', 0.95, 1.11, 0.67, 0.81, 0.34, 0.50, {real:REAL.alu}, b);
+  boxAt('brakeUnit', 1.02, 1.09, 0.81, 0.86, 0.38, 0.46, {real:REAL.white, tone:0.3}, b);
+  cyl('brakeUnit', 'x', 0.035, 1.11, 1.17, 0.74, 0.42, {real:REAL.dark}, b, 16);
+}
+function driveShafts(ax, segs){
+  for (const [z0, z1] of segs) {
+    const g = asm('driveShaft');
+    cyl('driveShaft', 'z', 0.016, z0, z1, ax, WR, {real:REAL.steel, metal:true}, g, 12);
+    const dir = Math.sign(z1 - z0);
+    cyl('driveShaft', 'z', 0.036, z0, z0 + dir*0.07, ax, WR, {real:REAL.rubber, tone:-0.2}, g, 16);
+    cyl('driveShaft', 'z', 0.036, z1 - dir*0.08, z1, ax, WR, {real:REAL.rubber, tone:-0.2}, g, 16);
+  }
+}
+
+/* ---------- cabin ---------- */
+function buildCabin(T){
+  const fy = TYPES[T].floor;
+  for (const sd of [1, -1]) {
+    const g = asm('seatsFront');
+    const zc = sd*0.37;
+    boxAt('seatsFront', -0.25, 0.25, fy + 0.20, fy + 0.30, zc - 0.25, zc + 0.25, {real:REAL.fabric}, g);
+    const bk = new THREE.BoxGeometry(0.10, 0.62, 0.50); bk.translate(0, 0.31, 0); bk.rotateZ(0.24); bk.translate(-0.27, fy + 0.25, zc);
+    add('seatsFront', bk, {real:REAL.fabric}, g);
+    const hr = new THREE.BoxGeometry(0.08, 0.17, 0.26); hr.translate(0, 0.70, 0); hr.rotateZ(0.24); hr.translate(-0.27, fy + 0.25, zc);
+    add('seatsFront', hr, {real:REAL.fabric, tone:0.05}, g);
+    for (const dz of [-0.19, 0.19]) boxAt('seatsFront', -0.24, 0.24, fy, fy + 0.035, zc + dz - 0.02, zc + dz + 0.02, {real:REAL.steel, tone:-0.2}, g);
+    for (const [dx, dz] of [[-0.2,-0.19],[0.2,-0.19],[-0.2,0.19],[0.2,0.19]]) boxAt('seatsFront', dx - 0.02, dx + 0.02, fy + 0.035, fy + 0.20, zc + dz - 0.02, zc + dz + 0.02, {real:REAL.steel, tone:-0.2}, g);
+  }
+  const r = asm('seatRear');
+  boxAt('seatRear', -0.92, -0.40, fy + 0.22, fy + 0.33, -0.66, 0.66, {real:REAL.fabric}, r);
+  const rb = new THREE.BoxGeometry(0.10, 0.56, 1.32); rb.translate(0, 0.28, 0); rb.rotateZ(0.30); rb.translate(-0.94, fy + 0.30, 0);
+  add('seatRear', rb, {real:REAL.fabric}, r);
+  for (const zc of [-0.42, 0.42]) { const h = new THREE.BoxGeometry(0.07, 0.14, 0.24); h.translate(0, 0.63, 0); h.rotateZ(0.30); h.translate(-0.94, fy + 0.30, zc); add('seatRear', h, {real:REAL.fabric, tone:0.05}, r); }
+  if (T !== 'hev') boxAt('seatRear', -0.88, -0.44, fy, fy + 0.22, -0.60, 0.60, {real:REAL.steel, tone:-0.25}, r);
+  // instrument panel (hollow) + console
+  const ipPts = [[0.93,0.62],[0.93,0.93],[0.72,0.975],[0.53,0.96],[0.47,0.89],[0.48,0.76],[0.56,0.66],[0.66,0.62]];
+  const cx = ipPts.reduce((s,p) => s + p[0], 0) / ipPts.length, cy = ipPts.reduce((s,p) => s + p[1], 0) / ipPts.length;
+  const ips = new THREE.Shape(ipPts.map(p => new THREE.Vector2(p[0], p[1])));
+  ips.holes.push(new THREE.Path(ipPts.map(p => new THREE.Vector2(cx + (p[0]-cx)*0.94, cy + (p[1]-cy)*0.93))));
+  const ipg = new THREE.ExtrudeGeometry(ips, {depth:1.60, bevelEnabled:false}); ipg.translate(0, 0, -0.80);
+  const gi = asm('ip');
+  add('ip', ipg, {real:REAL.black, tone:-0.05}, gi);
+  rod('ip', V(0.80, 0.80, -0.78), V(0.80, 0.80, 0.78), 0.022, {real:REAL.steel}, gi, 14);
+  shellBox('ip', -0.25, 0.48, fy, fy + 0.28, -0.11, 0.11, 0.008, {real:REAL.black, tone:-0.05}, asm('ip'));
+  // steering wheel
+  const sw = asm('steeringWheel');
+  const c = V(0.36, 0.90, 0.37), axv = V(-0.93, 0.37, 0).normalize();
+  const q = new THREE.Quaternion().setFromUnitVectors(V(0,0,1), axv);
+  const tor = new THREE.TorusGeometry(0.18, 0.016, 10, 48); tor.applyQuaternion(q); tor.translate(c.x, c.y, c.z);
+  add('steeringWheel', tor, {real:REAL.black}, sw);
+  const hub = new THREE.CylinderGeometry(0.075, 0.075, 0.07, 24); hub.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0,1,0), axv)); hub.translate(c.x, c.y, c.z);
+  add('steeringWheel', hub, {real:REAL.black, tone:0.1}, sw);
+  for (const a of [0, Math.PI*0.8, Math.PI*1.2]) {
+    const sp = new THREE.BoxGeometry(0.11, 0.022, 0.012); sp.translate(0.125, 0, 0); sp.rotateZ(a); sp.applyQuaternion(q); sp.translate(c.x, c.y, c.z);
+    add('steeringWheel', sp, {real:REAL.black}, sw);
+  }
+  // curtain airbags
+  for (const sd of [1, -1]) tube('curtainAirbag', [[0.62, 1.24, sd*0.82],[0.22, 1.37, sd*0.79],[-0.50, 1.405, sd*0.78],[-1.15, 1.335, sd*0.80]], 0.017, {real:REAL.white, tone:0.1}, null, 48);
+}
+
+/* ---------- electronics ---------- */
+function buildElec(T){
+  const fy = TYPES[T].floor;
+  for (const sd of [1, -1]) {
+    const h = asm('headlamp');
+    const g = new THREE.BoxGeometry(0.13, 0.08, 0.32); g.rotateY(-0.42*sd); g.translate(2.10, 0.70, sd*0.64);
+    add('headlamp', g, {real:REAL.white, tone:0.15}, h);
+    const l = cylG('x', 0.026, 2.15, 2.175, 0.70, sd*0.58, 16); add('headlamp', l, {real:REAL.glass, tone:0.4}, h);
+    const t = asm('taillamp');
+    const tg = new THREE.BoxGeometry(0.07, 0.07, 0.36); tg.rotateY(0.35*sd); tg.translate(-2.19, 0.92, sd*0.58);
+    add('taillamp', tg, {real:REAL.red, tone:0}, t);
+  }
+  boxAt('taillamp', -2.235, -2.215, 0.94, 0.96, -0.40, 0.40, {real:REAL.red, tone:0.1});
+  const cam = asm('camera');
+  boxAt('camera', 0.33, 0.41, 1.24, 1.285, -0.06, 0.06, {real:REAL.black}, cam);
+  cyl('camera', 'x', 0.012, 0.41, 0.43, 1.262, 0, {real:REAL.glass}, cam, 16);
+  const rad = asm('radar');
+  boxAt('radar', 2.235, 2.265, 0.57, 0.65, -0.055, 0.055, {real:REAL.dark}, rad);
+  const av = asm('avas');
+  cyl('avas', 'x', 0.04, 2.08, 2.12, 0.33, -0.30, {real:REAL.black}, av, 20);
+  boxAt('avas', 2.04, 2.08, 0.30, 0.36, -0.33, -0.27, {real:REAL.black, tone:-0.1}, av);
+  const d = asm('display');
+  const dg = new THREE.BoxGeometry(0.012, 0.15, 0.32); dg.rotateZ(0.2); dg.translate(0.555, 1.025, 0);
+  add('display', dg, {real:REAL.black, tone:0.1}, d);
+  const cg = new THREE.BoxGeometry(0.01, 0.07, 0.22); cg.rotateZ(0.25); cg.translate(0.50, 0.985, 0.37);
+  add('display', cg, {real:REAL.black, tone:0.1}, d);
+  const e = asm('ecu');
+  boxAt('ecu', 0.62, 0.80, 0.50, 0.555, -0.48, -0.26, {real:REAL.alu}, e);
+  boxAt('ecu', 0.64, 0.78, 0.555, 0.56, -0.46, -0.28, {real:REAL.pcb, tone:0.1}, e);
+  boxAt('ecu', -1.98, -1.84, ry(T) + 0.0, ry(T) + 0.05, -0.70, -0.52, {real:REAL.alu});
+  const tc = asm('tcu');
+  const fin = new THREE.Shape([new THREE.Vector2(-1.06, 1.418), new THREE.Vector2(-1.25, 1.402), new THREE.Vector2(-1.21, 1.475)].reverse());
+  const fg = new THREE.ExtrudeGeometry(fin, {depth:0.05, bevelEnabled:false}); fg.translate(0, 0, -0.025);
+  add('tcu', fg, {real:REAL.paint, tone:-0.1}, tc);
+  boxAt('tcu', -1.22, -1.06, 1.37, 1.39, -0.10, 0.10, {real:REAL.alu}, tc);
+  // 12 V battery
+  const lv = asm('lv12');
+  if (T === 'bev') { boxAt('lv12', 1.55, 1.79, 0.55, 0.72, -0.48, -0.33, {real:REAL.black}, lv); boxAt('lv12', 1.58, 1.62, 0.72, 0.74, -0.45, -0.42, {real:REAL.red}, lv); }
+  else { boxAt('lv12', -2.05, -1.85, ry(T), ry(T) + 0.17, 0.50, 0.68, {real:REAL.black}, lv); boxAt('lv12', -2.02, -1.98, ry(T) + 0.17, ry(T) + 0.19, 0.53, 0.56, {real:REAL.red}, lv); }
+  void fy;
+}
+const ry = T => TYPES[T].rear;
+
+/* ---------- thermal (common) ---------- */
+function buildThermalCommon(T){
+  const fe = asm('frontEnd');
+  boxAt('frontEnd', 2.005, 2.04, 0.29, 0.66, -0.47, 0.47, {real:REAL.alu, tone:0.05}, fe);
+  boxAt('frontEnd', 2.048, 2.066, 0.30, 0.65, -0.46, 0.46, {real:REAL.alu, tone:0.2}, fe);
+  for (const zc of [-0.22, 0.22]) {
+    add('frontEnd', annulusG(0.17, 0.155, 0.04, 32).rotateY(Math.PI/2).translate(1.965, 0.475, zc), {real:REAL.black}, fe);
+    add('frontEnd', cylG('x', 0.05, 1.94, 1.985, 0.475, zc, 20), {real:REAL.black, tone:0.1}, fe);
+    for (let i = 0; i < 7; i++) { const a = i/7*TAU; const bl = new THREE.BoxGeometry(0.006, 0.10, 0.035); bl.translate(0, 0.10, 0); bl.rotateX(a); bl.rotateZ(0); bl.translate(1.962, 0.475, zc); add('frontEnd', bl, {real:REAL.black, tone:0.15}, fe); }
+  }
+  const cp = asm('compressor');
+  if (T === 'bev') { cyl('compressor', 'x', 0.06, 1.55, 1.73, 0.34, 0.38, {real:REAL.alu}, cp, 24); cyl('compressor', 'x', 0.063, 1.73, 1.78, 0.34, 0.38, {real:REAL.dark}, cp, 24); }
+  else { cyl('compressor', 'x', 0.055, 1.80, 1.89, 0.33, 0.28, {real:REAL.alu}, cp, 24); cyl('compressor', 'x', 0.058, 1.89, 1.925, 0.33, 0.28, {real:REAL.dark}, cp, 24); }
+  const hv = shellBox('hvac', 0.66, 0.90, 0.64, 0.90, -0.25, 0.25, 0.006, {real:REAL.black, tone:0.1});
+  cyl('hvac', 'y', 0.07, 0.66, 0.78, 0.76, -0.12, {real:REAL.dark, tone:0.2}, hv, 24);
+  boxAt('hvac', 0.82, 0.85, 0.66, 0.88, -0.22, 0.22, {real:REAL.alu, tone:0.2}, hv);
+  boxAt('hvac', 0.72, 0.74, 0.66, 0.80, 0.02, 0.22, {real:REAL.copper, tone:0.3}, hv);
+}
+
+/* ---------- battery pack generic ---------- */
+function cellMatrices(fmt, R){
+  const out = [], M = () => new THREE.Matrix4();
+  const halfW = (R.z1 - R.z0 - R.cgap) / 2;
+  const segLen = (R.x1 - R.x0 - (R.mods - 1) * R.gap) / R.mods;
+  const yc = (R.y0 + R.y1) / 2;
+  let geo;
+  for (let mI = 0; mI < R.mods; mI++) {
+    const sx0 = R.x0 + mI * (segLen + R.gap), sx1 = sx0 + segLen;
+    for (const [hz0] of [[R.z0], [R.z0 + halfW + R.cgap]]) {
+      if (fmt === 'cylindrical') {
+        const d = 0.021, pitch = 0.0226, rowP = pitch * 0.866;
+        const rows = Math.floor((halfW - d) / rowP) + 1;
+        for (let j = 0; j < rows; j++) {
+          const z = hz0 + d/2 + j*rowP, off = (j % 2) * pitch/2;
+          for (let x = sx0 + d/2 + off; x <= sx1 - d/2 + 1e-6; x += pitch) out.push(M().makeTranslation(x, yc, z));
+        }
+      } else {
+        const n = fmt === 'pouch' ? R.nPouch : R.n, cols = R.cols;
+        const tx = segLen / n, wz = halfW / cols;
+        for (let i = 0; i < n; i++) for (let j = 0; j < cols; j++) out.push(M().makeTranslation(sx0 + tx*(i + 0.5), yc, hz0 + wz*(j + 0.5)));
+      }
+    }
+  }
+  if (fmt === 'cylindrical') geo = new THREE.CylinderGeometry(0.0105, 0.0105, R.y1 - R.y0 - 0.04, 8);
+  else {
+    const n = fmt === 'pouch' ? R.nPouch : R.n;
+    const tx = segLen / n, wz = halfW / R.cols;
+    geo = new THREE.BoxGeometry(tx * (fmt === 'pouch' ? 0.82 : 0.9), R.y1 - R.y0 - 0.006, wz - 0.012);
+  }
+  return {geo, mats:out, segLen};
+}
+function buildPack(T, fmt){
+  const bev = T === 'bev';
+  const P = bev ? {x0:-0.98, x1:0.92, z:0.70, y0:0.14, y1:0.31} : {x0:-0.85, x1:0.85, z:0.62, y0:0.13, y1:0.29};
+  const caseId = bev ? 'packCase' : 'phevPack', cellId = bev ? 'bevCells' : 'phevCells';
+  const cg = asm(caseId);
+  const fw = 0.05;
+  boxAt(caseId, P.x0, P.x1, P.y0, P.y0 + 0.008, -P.z, P.z, {real:REAL.alu}, cg);
+  boxAt(caseId, P.x0, P.x1, P.y1 - 0.004, P.y1, -P.z, P.z, {real:REAL.alu, tone:0.1}, cg);
+  const fh = P.y1 - P.y0 - 0.012, fc = (P.y0 + 0.008 + P.y1 - 0.004) / 2;
+  beam(caseId, V(P.x0, fc, P.z - fw/2), V(P.x1, fc, P.z - fw/2), fw, fh, 0.004, {real:REAL.alu}, cg, 2);
+  beam(caseId, V(P.x0, fc, -P.z + fw/2), V(P.x1, fc, -P.z + fw/2), fw, fh, 0.004, {real:REAL.alu}, cg, 2);
+  beam(caseId, V(P.x1 - fw/2, fc, -P.z + fw), V(P.x1 - fw/2, fc, P.z - fw), fw, fh, 0.004, {real:REAL.alu}, cg, 1);
+  beam(caseId, V(P.x0 + fw/2, fc, -P.z + fw), V(P.x0 + fw/2, fc, P.z - fw), fw, fh, 0.004, {real:REAL.alu}, cg, 1);
+  const inner = {x0:P.x0 + fw, x1:P.x1 - fw, z:P.z - fw};
+  const bduLen = 0.11;
+  const R = {x0:inner.x0 + bduLen + 0.01, x1:inner.x1 - 0.005, z0:-inner.z + 0.005, z1:inner.z - 0.005, y0:P.y0 + 0.026, y1:P.y1 - 0.016,
+    mods: bev ? 4 : 3, gap:0.03, cgap:0.03, n: bev ? 11 : 8, nPouch:40, cols:2};
+  // center beam & module crossmembers
+  boxAt(caseId, R.x0, R.x1, P.y0 + 0.008, R.y1, -0.012, 0.012, {real:REAL.alu, tone:-0.05}, cg);
+  const fmtUse = bev ? fmt : 'prismatic';
+  const cells = cellMatrices(fmtUse, R);
+  for (let mI = 1; mI < R.mods; mI++) { const xx = R.x0 + mI*(cells.segLen + R.gap) - R.gap/2; boxAt(caseId, xx - 0.009, xx + 0.009, P.y0 + 0.008, R.y1, -inner.z, inner.z, {real:REAL.alu, tone:-0.05}, cg); }
+  if (fmtUse !== 'cylindrical') for (let mI = 0; mI < R.mods; mI++) { const sx0 = R.x0 + mI*(cells.segLen + R.gap); for (const xx of [sx0, sx0 + cells.segLen]) for (const [a, b] of [[R.z0, -0.015], [0.015, R.z1]]) boxAt(caseId, xx - 0.003, xx + 0.003, R.y0, R.y1, a, b, {real:REAL.steel, tone:0.15}, cg); }
+  const cellG = asm(cellId, V((R.x0 + R.x1)/2, (R.y0 + R.y1)/2, 0));
+  addInst(cellId, cells.geo, cells.mats, {real:REAL.cell, tone:0.05}, cellG);
+  // busbars on top
+  for (const zc of [-0.33*inner.z, 0.33*inner.z]) boxAt(cellId, R.x0, R.x1, R.y1 + 0.001, R.y1 + 0.005, zc - 0.012, zc + 0.012, {real:REAL.copper, tone:0.35}, cellG);
+  // cooling plate
+  const cp = asm('coolPlate');
+  boxAt('coolPlate', R.x0, R.x1, P.y0 + 0.010, P.y0 + 0.022, R.z0, R.z1, {real:REAL.alu, tone:0.2}, cp);
+  for (const zc of [-0.06, 0.06]) cyl('coolPlate', 'x', 0.011, P.x1 - 0.02, P.x1 + 0.07, P.y0 + 0.03, zc, {real:REAL.coolant}, cp, 12);
+  // BMS (top front) and BDU (rear end)
+  const bm = asm('bms');
+  boxAt('bms', R.x1 - 0.20, R.x1 - 0.04, R.y1 + 0.006, R.y1 + 0.013, -0.22, 0.22, {real:REAL.pcb}, bm);
+  for (let i = 0; i < 4; i++) boxAt('bms', R.x1 - 0.18 + i*0.035, R.x1 - 0.16 + i*0.035, R.y1 + 0.013, R.y1 + 0.02, -0.04, 0.04, {real:REAL.black}, bm);
+  const bd = shellBox('bdu', inner.x0, inner.x0 + bduLen, P.y0 + 0.012, P.y1 - 0.008, -0.36, 0.36, 0.004, {real:REAL.alu, tone:-0.1});
+  for (const zc of [-0.22, -0.08, 0.08, 0.22]) cyl('bdu', 'y', 0.026, P.y0 + 0.02, P.y0 + 0.11, inner.x0 + bduLen/2, zc, {real:REAL.black, tone:0.15}, bd, 20);
+  boxAt('bdu', inner.x0 + 0.01, inner.x0 + bduLen - 0.01, P.y0 + 0.115, P.y0 + 0.125, -0.32, 0.32, {real:REAL.copper, tone:0.35}, bd);
+  return {P, inner, R};
+}
+
+/* ---------- e-axle (motor + inverter + reducer), local origin on axle centre ---------- */
+function motorCore(id, parent, o){
+  const {rs, rsi, rr, len, shaft, slots = 36, poles = 8} = o;
+  const st = circleShape(rs); st.holes.push(holeCircle(rsi));
+  const slotR = (rs - rsi) * 0.16, slotC = rsi + (rs - rsi) * 0.38, wind = [];
+  for (let i = 0; i < slots; i++) { const a = i/slots*TAU, cx = Math.cos(a)*slotC, cy = Math.sin(a)*slotC; st.holes.push(holeCircle(slotR, cx, cy)); wind.push(circleShape(slotR*0.9, cx, cy)); }
+  add(id, extrudeZ(st, len, 16), {real:REAL.steel, tone:0.05}, parent);
+  add(id, extrudeZ(wind, len, 3), {real:REAL.copper, tone:0.35}, parent);
+  for (const s of [-1, 1]) { const tg = new THREE.TorusGeometry(slotC, slotR*1.7, 8, 40); tg.translate(0, 0, s*(len/2 + slotR*1.5)); add(id, tg, {real:REAL.copper, tone:0.35}, parent); }
+  const ro = circleShape(rr); ro.holes.push(holeCircle(shaft*1.02));
+  const mags = [];
+  for (let i = 0; i < poles; i++) {
+    const a = i/poles*TAU, c = Math.cos(a), s = Math.sin(a), rad = rr*0.78, w = rr*0.42, t = rr*0.10;
+    const pt = (u, v) => new THREE.Vector2((rad + v)*c - u*s, (rad + v)*s + u*c);
+    ro.holes.push(new THREE.Path([pt(-w/2, -t/2), pt(w/2, -t/2), pt(w/2, t/2), pt(-w/2, t/2)]));
+    mags.push(new THREE.Shape([pt(-w*0.46, -t*0.4), pt(w*0.46, -t*0.4), pt(w*0.46, t*0.4), pt(-w*0.46, t*0.4)]));
+  }
+  add(id, extrudeZ(ro, len, 16), {real:REAL.dark, tone:-0.08}, parent);
+  add(id, extrudeZ(mags, len*0.98, 2), {real:REAL.magnet, tone:0.45}, parent);
+  add(id, cylG('z', shaft, -len*0.85, len*0.85, 0, 0, 16), {real:REAL.steel, metal:true, tone:0.2}, parent);
+}
+function buildEAxle(ids, s, z0){
+  // motor axis 0.16 m ahead of axle; reducer on +z side
+  const place = g => { g.position.set(RA, WR, 0); g.scale.setScalar(s); return g; };
+  const mg = place(asm(ids.motor, V(RA + 0.16*s, WR, -0.15*s)));
+  const mg2 = new THREE.Group(); mg2.position.set(0.16, 0, -0.15); mg.add(mg2);
+  add(ids.motor, annulusG(0.125, 0.113, 0.27, 32), {real:REAL.alu}, mg2);
+  for (const zz of [-0.141, 0.141]) { const p = annulusG(0.125, 0.026, 0.012, 32); p.translate(0, 0, zz); add(ids.motor, p, {real:REAL.alu, tone:0.1}, mg2); }
+  motorCore(ids.motor, mg2, {rs:0.110, rsi:0.072, rr:0.069, len:0.19, shaft:0.022});
+  // reducer
+  const rg = place(asm(ids.red, V(RA + 0.05*s, WR + 0.05*s, 0.10*s)));
+  housingZ(ids.red, -0.125, 0.215, -0.12, 0.22, 0.02, 0.18, 0.007, 0.05, {real:REAL.alu, tone:-0.05}, rg);
+  const C = [0.093, 0.117];
+  const gear = (r, n, x, y, za, zb, hole) => { const g = gearG(r, n, zb - za, hole); g.translate(x, y, (za + zb)/2); add(ids.red, g, {real:REAL.steel, metal:true, tone:0.15}, rg); };
+  gear(0.045, 18, 0.16, 0, 0.06, 0.10);
+  gear(0.09, 36, C[0], C[1], 0.06, 0.10, 0.012);
+  gear(0.04, 16, C[0], C[1], 0.11, 0.15);
+  gear(0.11, 44, 0, 0, 0.11, 0.15, 0.056);
+  add(ids.red, cylG('z', 0.054, 0.05, 0.17, 0, 0, 20), {real:REAL.iron, tone:0.05}, rg);
+  add(ids.red, cylG('z', 0.012, 0.03, 0.17, C[0], C[1], 10), {real:REAL.steel, tone:0.25}, rg);
+  // inverter
+  const ig = place(asm(ids.inv, V(RA + 0.165*s, WR + 0.17*s, -0.15*s)));
+  shellBox(ids.inv, 0.03, 0.30, 0.13, 0.215, -0.29, -0.01, 0.005, {real:REAL.alu, tone:0.05}, ig);
+  boxAt(ids.inv, 0.045, 0.135, 0.137, 0.195, -0.27, -0.05, {real:REAL.dark, tone:-0.1}, ig);
+  boxAt(ids.inv, 0.155, 0.28, 0.137, 0.165, -0.26, -0.04, {real:REAL.black, tone:0.2}, ig);
+  for (let i = 0; i < 6; i++) boxAt(ids.inv, 0.16 + i*0.02, 0.17 + i*0.02, 0.165, 0.18, -0.24, -0.06, {real:REAL.copper, tone:0.3}, ig);
+  boxAt(ids.inv, 0.045, 0.285, 0.198, 0.204, -0.275, -0.025, {real:REAL.pcb, tone:0.1}, ig);
+  for (let i = 0; i < 3; i++) boxAt(ids.inv, 0.20 + i*0.025, 0.21 + i*0.025, 0.08, 0.137, -0.03, -0.02, {real:REAL.copper, tone:0.3}, ig);
+  return {left:[0.02*s, -0.70], right:[0.18*s, 0.70]};
+}
+
+/* ---------- HEV / PHEV front powertrain ---------- */
+const CRANK = [1.61, 0.37];
+function buildEngine(){
+  const bx0 = 1.46, bx1 = 1.76, bz0 = 0.04, bz1 = 0.50;
+  const bores = [0.105, 0.215, 0.325, 0.435], bore = 0.0403;
+  // block barrel with bores (shape in x / -z, extruded up)
+  const s = new THREE.Shape([V(bx0, -bz1), V(bx1, -bz1), V(bx1, -bz0), V(bx0, -bz0)].map(v => new THREE.Vector2(v.x, v.y)));
+  bores.forEach(bz => s.holes.push(holeCircle(bore, CRANK[0], -bz)));
+  const bg = new THREE.ExtrudeGeometry(s, {depth:0.20, bevelEnabled:false, curveSegments:12});
+  bg.rotateX(-Math.PI/2); bg.translate(0, 0.44, 0);
+  const eb = asm('engineBlock');
+  add('engineBlock', bg, {real:REAL.alu, tone:0.05}, eb);
+  shellBox('engineBlock', bx0, bx1, 0.24, 0.44, bz0, bz1, 0.008, {real:REAL.alu, tone:-0.05}, eb, true);
+  // pistons, conrods, crank
+  const pg = asm('piston');
+  const phase = [0, Math.PI, Math.PI, 0];
+  bores.forEach((bz, i) => {
+    const crankR = 0.045, ang = phase[i] + 0.5;
+    const pin = V(CRANK[0] + Math.sin(ang)*crankR, CRANK[1] + Math.cos(ang)*crankR, bz);
+    const py = pin.y + 0.14;
+    add('piston', cylG('y', bore - 0.0015, py, py + 0.05, CRANK[0], bz, 24), {real:REAL.alu, tone:0.25}, pg);
+    rod('piston', pin, V(CRANK[0], py + 0.02, bz), 0.011, {real:REAL.steel}, pg);
+    add('piston', cylG('z', 0.017, bz - 0.022, bz + 0.022, pin.x, pin.y, 12), {real:REAL.steel, tone:0.2}, pg);
+    const w = new THREE.BoxGeometry(0.11, 0.05, 0.016); w.translate(0, -0.02, 0); w.rotateZ(-ang); w.translate(CRANK[0], CRANK[1], bz - 0.03); add('piston', w, {real:REAL.iron}, pg);
+  });
+  add('piston', cylG('z', 0.022, bz0 - 0.02, bz1 + 0.02, CRANK[0], CRANK[1], 16), {real:REAL.steel, metal:true}, pg);
+  // head
+  const hg = shellBox('cylHead', bx0, bx1, 0.64, 0.745, bz0, bz1, 0.008, {real:REAL.alu, tone:0.12});
+  for (const cx of [1.565, 1.655]) add('cylHead', cylG('z', 0.016, bz0 + 0.01, bz1 - 0.01, cx, 0.715, 12), {real:REAL.steel, tone:0.2}, hg);
+  bores.forEach(bz => { for (const vx of [1.575, 1.645]) rod('cylHead', V(vx, 0.645, bz), V(vx + (vx < 1.61 ? 0.02 : -0.02) * -1, 0.70, bz), 0.004, {real:REAL.steel, tone:0.3}, hg); });
+  boxAt('cylHead', bx0 + 0.01, bx1 - 0.01, 0.745, 0.785, bz0 + 0.01, bz1 - 0.01, {real:REAL.black, tone:0.15}, hg);
+  bores.forEach(bz => add('cylHead', cylG('y', 0.014, 0.785, 0.81, CRANK[0], bz, 12), {real:REAL.black, tone:0.3}, hg));
+  // intake
+  const ig = asm('intake');
+  add('intake', cylG('z', 0.04, bz0, bz1, 1.885, 0.52, 20), {real:REAL.black, tone:0.1}, ig);
+  bores.forEach(bz => tube('intake', [[1.885, 0.555, bz], [1.86, 0.65, bz], [1.80, 0.69, bz], [1.755, 0.69, bz]], 0.018, {real:REAL.black, tone:0.1}, ig, 24));
+  add('intake', cylG('z', 0.035, -0.02, bz0, 1.885, 0.52, 20), {real:REAL.alu}, ig);
+  boxAt('intake', 1.64, 1.90, 0.725, 0.81, 0.22, 0.48, {real:REAL.black, tone:0.05}, ig);
+  tube('intake', [[1.885, 0.52, -0.02], [1.90, 0.62, -0.05], [1.86, 0.74, 0.10], [1.80, 0.765, 0.22]], 0.032, {real:REAL.black, tone:0.1}, ig, 32);
+  // exhaust manifold + close-coupled catalyst
+  const xg = asm('exhaustMani');
+  bores.forEach(bz => tube('exhaustMani', [[1.455, 0.69, bz], [1.41, 0.68, bz], [1.37, 0.64, (bz + 0.27)/2], [1.31, 0.60, 0.27]], 0.016, {real:REAL.iron, tone:0.1}, xg, 24));
+  add('exhaustMani', cylG('y', 0.065, 0.40, 0.585, 1.30, 0.27, 24), {real:REAL.steel, tone:0.15}, xg);
+  add('exhaustMani', cylG('y', 0.052, 0.415, 0.57, 1.30, 0.27, 24), {real:REAL.white, tone:0.35}, xg);
+}
+function buildHybridTransaxle(){
+  const A = [CRANK[0], CRANK[1]], C = [1.491, 0.422], F = [FA, WR];
+  const hg = housingZ('hevTransaxle', 1.25, 1.79, 0.215, 0.60, -0.53, -0.005, 0.007, 0.07, {real:REAL.alu, tone:-0.05});
+  const gear = (r, n, x, y, za, zb, hole) => { const g = gearG(r, n, zb - za, hole); g.translate(x, y, (za + zb)/2); add('hevTransaxle', g, {real:REAL.steel, metal:true, tone:0.15}, hg); };
+  gear(0.055, 22, A[0], A[1], -0.13, -0.10, 0.02);
+  gear(0.075, 30, C[0], C[1], -0.13, -0.10, 0.012);
+  gear(0.045, 18, C[0], C[1], -0.08, -0.05);
+  gear(0.10, 40, F[0], F[1], -0.08, -0.05, 0.05);
+  add('hevTransaxle', cylG('z', 0.048, -0.12, -0.02, F[0], F[1], 20), {real:REAL.iron}, hg);
+  add('hevTransaxle', cylG('z', 0.012, -0.135, -0.04, C[0], C[1], 10), {real:REAL.steel, tone:0.25}, hg);
+  add('hevTransaxle', cylG('z', 0.02, -0.50, 0.03, A[0], A[1], 14), {real:REAL.steel, metal:true, tone:0.2}, hg);
+  const dmp = annulusG(0.12, 0.03, 0.025, 32); dmp.translate(A[0], A[1], 0.02); add('hevTransaxle', dmp, {real:REAL.iron, tone:0.1}, hg);
+  const m1 = asm('mg1'), m1g = new THREE.Group(); m1g.position.set(A[0], A[1], -0.445); m1.add(m1g);
+  motorCore('mg1', m1g, {rs:0.115, rsi:0.075, rr:0.072, len:0.09, shaft:0.022, slots:24, poles:8});
+  const m2 = asm('mg2'), m2g = new THREE.Group(); m2g.position.set(A[0], A[1], -0.23); m2.add(m2g);
+  motorCore('mg2', m2g, {rs:0.15, rsi:0.098, rr:0.094, len:0.11, shaft:0.022, slots:48, poles:8});
+  const ps = asm('psd');
+  const rs = circleShape(0.098); rs.holes.push(holeCircle(0.078));
+  const rgG = extrudeZ(rs, 0.035, 24); rgG.translate(A[0], A[1], -0.34); add('psd', rgG, {real:REAL.steel, metal:true, tone:0.25}, ps);
+  const sg = gearG(0.025, 12, 0.035); sg.translate(A[0], A[1], -0.34); add('psd', sg, {real:REAL.steel, metal:true, tone:0.35}, ps);
+  for (let i = 0; i < 4; i++) { const a = i/4*TAU + 0.4; const pg = gearG(0.024, 12, 0.03); pg.translate(A[0] + Math.cos(a)*0.051, A[1] + Math.sin(a)*0.051, -0.34); add('psd', pg, {real:REAL.steel, metal:true, tone:0.05}, ps); }
+  const car = annulusG(0.085, 0.022, 0.006, 24); car.translate(A[0], A[1], -0.318); add('psd', car, {real:REAL.iron, tone:0.1}, ps);
+  // PCU on top of the transaxle
+  const pc = shellBox('pcu', 1.32, 1.74, 0.635, 0.77, -0.48, -0.06, 0.005, {real:REAL.alu, tone:0.05});
+  for (let i = 0; i < 7; i++) boxAt('pcu', 1.36 + i*0.026, 1.374 + i*0.026, 0.645, 0.73, -0.44, -0.30, {real:REAL.black, tone:0.2}, pc);
+  boxAt('pcu', 1.55, 1.71, 0.645, 0.72, -0.44, -0.30, {real:REAL.dark, tone:-0.1}, pc);
+  const lG = new THREE.TorusGeometry(0.045, 0.02, 10, 28); lG.rotateX(Math.PI/2); lG.translate(1.45, 0.68, -0.18); add('pcu', lG, {real:REAL.copper, tone:0.35}, pc);
+  boxAt('pcu', 1.55, 1.71, 0.645, 0.70, -0.24, -0.10, {real:REAL.alu, tone:0.2}, pc);
+  boxAt('pcu', 1.34, 1.72, 0.745, 0.752, -0.46, -0.08, {real:REAL.pcb, tone:0.1}, pc);
+}
+function buildFuel(T){
+  const g = asm('fuelTank');
+  const x0 = -1.12, x1 = -0.88, y0 = 0.15, y1 = 0.47, zz = 0.50, t = 0.008;
+  housingZ('fuelTank', x0, x1, y0, y1, -zz, zz, t, 0.05, {real:REAL.black, tone:-0.15}, g);
+  const lvl = y0 + t + (y1 - y0 - 2*t) * 0.58;
+  const f = new THREE.ExtrudeGeometry(roundRectShape(x0 + t + 0.002, y0 + t + 0.002, x1 - t - 0.002, lvl, 0.04), {depth:2*zz - 2*t - 0.004, bevelEnabled:false, curveSegments:6});
+  f.translate(0, 0, -zz + t + 0.002); add('fuelTank', f, {real:REAL.fuel, tone:0.25}, g);
+  tube('fuelTank', [[-1.05, 0.46, -0.42], [-1.40, 0.62, -0.55], [-1.70, 0.80, -0.70], [-1.72, 0.86, -0.865]], 0.02, {real:REAL.black, tone:0.05}, g, 40);
+  add('fuelTank', cylG('z', 0.055, -0.905, -0.885, -1.72, 0.87, 24), {real:REAL.paint, tone:0.1}, g);
+  void T;
+}
+function buildExhaust(T){
+  const sd = T === 'phev' ? -1 : 1;
+  const g = asm('exhaustPipe');
+  const path = sd > 0
+    ? [[1.30, 0.40, 0.27], [1.24, 0.25, 0.31], [1.10, 0.18, 0.40], [0.85, 0.155, 0.56], [0.40, 0.155, 0.58], [-0.80, 0.155, 0.58], [-1.40, 0.165, 0.58], [-1.70, 0.21, 0.52], [-1.80, 0.26, 0.44]]
+    : [[1.30, 0.40, 0.27], [1.24, 0.25, 0.20], [1.10, 0.16, 0.0], [0.92, 0.13, -0.45], [0.75, 0.13, -0.69], [0.30, 0.13, -0.70], [-0.80, 0.14, -0.70], [-1.00, 0.155, -0.58], [-1.40, 0.165, -0.58], [-1.70, 0.21, -0.52], [-1.80, 0.26, -0.44]];
+  tube('exhaustPipe', path, 0.024, {real:REAL.steel, tone:-0.05}, g, 140);
+  const m = annulusG(0.095, 0.0, 0.42, 28); m.translate(-1.92, 0.27, sd*0.40); add('exhaustPipe', m, {real:REAL.steel, tone:0.05}, g);
+  tube('exhaustPipe', [[-1.92, 0.27, sd*0.61], [-2.05, 0.25, sd*0.64], [-2.16, 0.22, sd*0.64]], 0.024, {real:REAL.steel, tone:-0.05}, g, 24);
+}
+
+/* ---------- powertrain-specific assemblies ---------- */
+function hvTube(pts, r = 0.014){ tube('hvCable', pts, r, {real:REAL.hv, tone:0.1}, null, 80); }
+function coolTube(pts, r = 0.014){ tube('coolantPipe', pts, r, {real:REAL.coolant, tone:0.1}, null, 80); }
+
+function buildBEV(fmt){
+  buildPack('bev', fmt);
+  const ds = buildEAxle({motor:'bevMotor', inv:'bevInverter', red:'bevReducer'}, 1);
+  driveShafts(RA, [[ds.left[0], ds.left[1]], [ds.right[0], ds.right[1]]]);
+  // front bay
+  const fk = asm('frunk');
+  shellBox('frunk', 1.45, 1.90, 0.45, 0.79, -0.30, 0.30, 0.006, {real:REAL.black, tone:0.1}, fk, true);
+  const tm = shellBox('thermalModule', 1.08, 1.40, 0.50, 0.72, -0.05, 0.30, 0.005, {real:REAL.black, tone:0.1});
+  for (let i = 0; i < 4; i++) cyl('thermalModule', 'y', 0.022, 0.51, 0.64, 1.13 + i*0.07, 0.05, {real:REAL.alu, tone:0.2}, tm, 16);
+  boxAt('thermalModule', 1.12, 1.36, 0.53, 0.60, 0.15, 0.27, {real:REAL.alu, tone:0.05}, tm);
+  cyl('thermalModule', 'y', 0.045, 0.72, 0.80, 1.30, 0.20, {real:REAL.white, tone:0.3}, tm, 20);
+  // OBC / DC-DC at the rear
+  const ob = shellBox('obc', -2.02, -1.80, 0.38, 0.52, 0.05, 0.42, 0.005, {real:REAL.alu});
+  boxAt('obc', -1.99, -1.84, 0.39, 0.46, 0.08, 0.22, {real:REAL.copper, tone:0.25}, ob);
+  boxAt('obc', -1.99, -1.84, 0.39, 0.47, 0.25, 0.39, {real:REAL.dark, tone:-0.1}, ob);
+  boxAt('obc', -2.00, -1.82, 0.49, 0.495, 0.07, 0.40, {real:REAL.pcb}, ob);
+  chargePort(true);
+  // HV cables
+  const bx = -0.98 + 0.05 + 0.055;
+  for (const dz of [-0.03, 0.03]) {
+    hvTube([[bx, 0.25, 0.20 + dz], [-1.02, 0.30, 0.20 + dz], [-1.10, 0.42, 0.10 + dz], [-1.12, 0.505, -0.02 + dz]]);
+    hvTube([[bx, 0.25, 0.32 + dz], [-1.05, 0.40, 0.36 + dz], [-1.30, 0.535, 0.36 + dz], [-1.60, 0.52, 0.32 + dz], [-1.80, 0.47, 0.30 + dz]], 0.011);
+    hvTube([[-1.72, 0.86, 0.835 + dz*0.5], [-1.76, 0.70, 0.64], [-1.62, 0.56, 0.52 + dz], [-1.20, 0.50, 0.50 + dz], [-1.00, 0.30, 0.45 + dz], [bx, 0.25, 0.40 + dz]], 0.015);
+    hvTube([[0.93, 0.25, 0.15 + dz], [1.05, 0.33, 0.20 + dz], [1.40, 0.37, 0.34 + dz], [1.55, 0.34, 0.38 + dz]], 0.011);
+  }
+  hvTube([[-1.80, 0.86, 0.83], [-1.84, 0.70, 0.62], [-1.90, 0.52, 0.42]], 0.009);
+  // coolant
+  for (const zc of [-0.06, 0.06]) coolTube([[0.99, 0.17, zc], [1.04, 0.30, zc], [1.10, 0.52, zc + 0.05]]);
+  coolTube([[2.00, 0.58, 0.32], [1.70, 0.62, 0.35], [1.40, 0.62, 0.22]]);
+  coolTube([[2.00, 0.36, 0.30], [1.70, 0.44, 0.33], [1.40, 0.53, 0.25]]);
+  coolTube([[1.08, 0.66, 0.10], [0.99, 0.70, 0.05], [0.90, 0.72, 0.02]], 0.012);
+}
+function chargePort(dual){
+  const g = asm('chargePort');
+  boxAt('chargePort', dual ? -1.88 : -1.80, -1.58, 0.80, 0.96, 0.82, 0.885, {real:REAL.black, tone:-0.05}, g);
+  if (dual) { add('chargePort', cylG('z', 0.045, 0.80, 0.89, -1.66, 0.88, 24), {real:REAL.black, tone:0.15}, g); for (const [dx, dy] of [[-0.015, 0.015], [0.015, 0.015], [0, -0.015]]) add('chargePort', cylG('z', 0.007, 0.86, 0.892, -1.66 + dx, 0.88 + dy, 10), {real:REAL.copper, tone:0.4}, g); }
+  add('chargePort', cylG('z', 0.032, 0.80, 0.89, dual ? -1.80 : -1.69, 0.88, 24), {real:REAL.black, tone:0.15}, g);
+}
+function buildHybridFront(){
+  buildEngine();
+  buildHybridTransaxle();
+  driveShafts(FA, [[-0.53, -0.70], [-0.005, 0.70]]);
+}
+function buildHEV(){
+  buildHybridFront();
+  // HV battery under rear seat
+  const fy = TYPES.hev.floor;
+  const bg = shellBox('hevBattery', -0.80, -0.35, fy + 0.008, fy + 0.18, -0.42, 0.42, 0.004, {real:REAL.steel, tone:-0.05});
+  boxAt('hevBattery', -0.79, -0.72, fy + 0.02, fy + 0.13, -0.38, 0.38, {real:REAL.dark, tone:0.1}, bg);
+  const mats = [];
+  for (const xc of [-0.455, -0.63]) for (let i = 0; i < 28; i++) mats.push(new THREE.Matrix4().makeTranslation(xc, fy + 0.075, -0.378 + i*0.028));
+  const cg = asm('hevCells', V(-0.54, fy + 0.075, 0));
+  addInst('hevCells', new THREE.BoxGeometry(0.15, 0.11, 0.024), mats, {real:REAL.cell, tone:0.05}, cg);
+  for (const xc of [-0.455, -0.63]) boxAt('hevCells', xc - 0.03, xc + 0.03, fy + 0.131, fy + 0.136, -0.39, 0.39, {real:REAL.copper, tone:0.35}, cg);
+  const fan = asm('hevBattFan');
+  add('hevBattFan', cylG('z', 0.06, 0.44, 0.56, -0.56, fy + 0.10, 24), {real:REAL.black, tone:0.1}, fan);
+  tube('hevBattFan', [[-0.56, fy + 0.16, 0.56], [-0.50, fy + 0.25, 0.62], [-0.38, fy + 0.30, 0.66]], 0.03, {real:REAL.black, tone:0.15}, fan, 24);
+  // HV cable battery -> PCU, PCU -> compressor
+  for (const dz of [-0.025, 0.025]) {
+    hvTube([[-0.34, fy + 0.08, 0.30 + dz], [-0.25, 0.17, 0.36 + dz], [0.80, 0.17, 0.36 + dz], [1.06, 0.30, 0.25 + dz], [1.12, 0.50, 0.12 + dz], [1.30, 0.66, -0.12 + dz], [1.36, 0.70, -0.22 + dz]]);
+  }
+  hvTube([[1.70, 0.70, -0.08], [1.86, 0.56, 0.10], [1.84, 0.40, 0.22]], 0.01);
+  buildFuel('hev'); buildExhaust('hev');
+  coolTube([[2.00, 0.60, 0.20], [1.86, 0.66, 0.30], [1.76, 0.66, 0.40]], 0.016);
+  coolTube([[2.00, 0.33, -0.10], [1.85, 0.30, 0.0], [1.76, 0.36, 0.10]], 0.016);
+  coolTube([[2.00, 0.56, -0.38], [1.84, 0.64, -0.42], [1.74, 0.70, -0.40]], 0.012);
+  coolTube([[1.46, 0.60, 0.12], [1.15, 0.66, 0.08], [0.95, 0.74, 0.05]], 0.012);
+}
+function buildPHEV(){
+  buildHybridFront();
+  const pk = buildPack('phev', 'prismatic');
+  const ds = buildEAxle({motor:'rearEdu', inv:'rearEdu', red:'rearEdu'}, 0.8);
+  driveShafts(RA, [[ds.left[0], ds.left[1]], [ds.right[0], ds.right[1]]]);
+  const ob = shellBox('obc', -2.02, -1.80, 0.38, 0.52, 0.05, 0.42, 0.005, {real:REAL.alu});
+  boxAt('obc', -1.99, -1.84, 0.39, 0.46, 0.08, 0.22, {real:REAL.copper, tone:0.25}, ob);
+  boxAt('obc', -2.00, -1.82, 0.49, 0.495, 0.07, 0.40, {real:REAL.pcb}, ob);
+  chargePort(false);
+  const bx = pk.inner.x0 + 0.055;
+  for (const dz of [-0.03, 0.03]) {
+    hvTube([[0.86, 0.22, 0.10 + dz], [0.97, 0.25, 0.10 + dz], [1.12, 0.46, 0.06 + dz], [1.30, 0.66, -0.12 + dz], [1.36, 0.70, -0.22 + dz]]);
+    hvTube([[bx, 0.22, 0.10 + dz], [-0.95, 0.30, 0.05 + dz], [-1.10, 0.43, -0.05 + dz], [-1.17, 0.47, -0.10 + dz]], 0.012);
+    hvTube([[bx, 0.22, 0.30 + dz], [-1.05, 0.40, 0.36 + dz], [-1.30, 0.535, 0.36 + dz], [-1.60, 0.52, 0.32 + dz], [-1.80, 0.47, 0.30 + dz]], 0.011);
+  }
+  hvTube([[-1.69, 0.86, 0.84], [-1.74, 0.70, 0.62], [-1.86, 0.52, 0.42]], 0.009);
+  hvTube([[1.70, 0.70, -0.08], [1.86, 0.56, 0.10], [1.84, 0.40, 0.22]], 0.01);
+  buildFuel('phev'); buildExhaust('phev');
+  coolTube([[2.00, 0.60, 0.20], [1.86, 0.66, 0.30], [1.76, 0.66, 0.40]], 0.016);
+  coolTube([[2.00, 0.33, -0.10], [1.85, 0.30, 0.0], [1.76, 0.36, 0.10]], 0.016);
+  coolTube([[2.00, 0.56, -0.38], [1.84, 0.64, -0.42], [1.74, 0.70, -0.40]], 0.012);
+  for (const zc of [-0.06, 0.06]) coolTube([[0.92, 0.16, zc], [1.00, 0.20, zc + 0.5], [1.85, 0.29, 0.55], [2.00, 0.34, 0.40 + zc]], 0.011);
+}
+
+/* ======================================================================
+   Build / rebuild
+   ====================================================================== */
+const state = {type:'bev', mode:'solid', color:'sys', ghost:0.14, explode:0, cell:'prismatic', isolate:false, sel:null, hover:null,
+  sys:Object.fromEntries(SYS_ORDER.map(k => [k, k === 'exterior' ? 'ghost' : 'solid']))};
+
+function disposeAll(){
+  const geos = new Set();
+  root.traverse(o => { if (o.geometry) geos.add(o.geometry); });
+  geos.forEach(g => g.dispose());
+  for (const p of parts.values()) { p.mats.forEach(m => m.dispose()); p.xray.dispose(); root.remove(p.group); }
+  parts = new Map(); matCache = new Map(); asmList = []; pickables = [];
+}
+function build(){
+  disposeAll();
+  const T = state.type;
+  buildExterior(); buildBIW(T); buildWheels(); buildSuspension(); buildSteeringBrakes();
+  buildCabin(T); buildElec(T); buildThermalCommon(T);
+  if (T === 'bev') buildBEV(state.cell); else if (T === 'hev') buildHEV(); else buildPHEV();
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3(), c = new THREE.Vector3();
+  for (const g of asmList) {
+    g.userData.base = g.position.clone();
+    if (g.userData.center) c.copy(g.userData.center); else { box.setFromObject(g); box.getCenter(c); }
+    g.userData.dir = V(c.x * 0.30, (c.y - 0.45) * 1.25, c.z * 0.95);
+  }
+  if (state.sel && !parts.has(state.sel)) { state.sel = null; hideCard(); }
+  applyExplode(); applyLook(); buildLists(); updateHud();
+  if (state.sel) showCard(state.sel, true);
+}
+function applyExplode(){
+  const f = state.explode;
+  for (const g of asmList) g.position.copy(g.userData.base).addScaledVector(g.userData.dir, f);
+  requestRender();
+}
+function partState(p){
+  let s = state.sys[p.sys] || 'solid';
+  if (s !== 'hidden' && state.isolate && state.sel && p.id !== state.sel) s = 'iso';
+  return s;
+}
+function baseColor(ud, p){
+  const c = new THREE.Color();
+  if (state.color === 'real' && ud.real != null) c.setHex(ud.real);
+  else { c.setHex(SYS[p.sys].c); if (ud.tone) c.offsetHSL(0, ud.tone > 0 ? -0.08*ud.tone : 0, ud.tone * 0.16); }
+  return c;
+}
+function applyLook(){
+  const xr = state.mode === 'xray';
+  for (const p of parts.values()) {
+    const st = partState(p), sel = p.id === state.sel, hov = p.id === state.hover && !sel;
+    p.group.visible = st !== 'hidden';
+    if (st === 'hidden') continue;
+    if (xr) {
+      const u = p.xray.uniforms;
+      u.uColor.value.setHex(SYS[p.sys].c); if (sel) u.uColor.value.copy(ACC);
+      u.uStrength.value = sel ? 2.8 : hov ? 2.0 : st === 'solid' ? 1.0 : 0.35;
+      for (const m of p.meshes) m.material = p.xray;
+      continue;
+    }
+    for (const m of p.meshes) m.material = m.userData.solid;
+    for (const mt of p.mats) {
+      const ud = mt.userData, col = baseColor(ud, p);
+      mt.color.copy(col);
+      const ghost = st === 'ghost' || st === 'iso';
+      let op = 1;
+      if (ud.glass) op = ghost ? Math.min(0.3, state.ghost * 0.8) : 0.3;
+      else if (ghost) op = st === 'iso' ? Math.max(0.035, state.ghost * 0.45) : state.ghost;
+      const tr = op < 0.999;
+      if (mt.transparent !== tr) { mt.transparent = tr; mt.needsUpdate = true; }
+      mt.opacity = op; mt.depthWrite = !tr;
+      const side = (tr && !ud.glass) ? THREE.FrontSide : THREE.DoubleSide;
+      if (mt.side !== side) { mt.side = side; mt.needsUpdate = true; }
+      ud.uCapOn.value = (!tr && ud.cap) ? 1 : 0;
+      ud.uCap.value.copy(col).lerp(WHITE, 0.42); if (sel) ud.uCap.value.lerp(ACC, 0.6);
+      mt.emissive.copy(sel || hov ? ACC : BLACK).multiplyScalar(sel ? 0.42 : hov ? 0.18 : 0);
+    }
+  }
+  updateHelpers();
+  requestRender();
+}
+
+/* ======================================================================
+   Render loop, resize, gizmo
+   ====================================================================== */
+let needs = true;
+function requestRender(){ needs = true; }
+const gz = $('#gizmo'), gctx = gz.getContext('2d');
+function drawGizmo(){
+  const s = gz.width; gctx.clearRect(0, 0, s, s);
+  const q = camera.quaternion.clone().invert();
+  const axes = [['X', V(1,0,0), AXC.x], ['Y', V(0,0,-1), AXC.y], ['Z', V(0,1,0), AXC.z]]
+    .map(([l, v, c]) => ({l, c, p:v.applyQuaternion(q)})).sort((a, b) => a.p.z - b.p.z);
+  const cx = s/2, cy = s/2, R = s*0.33;
+  gctx.lineCap = 'round'; gctx.font = `600 ${Math.round(s*0.13)}px "IBM Plex Mono", ui-monospace, monospace`; gctx.textAlign = 'center'; gctx.textBaseline = 'middle';
+  gctx.globalAlpha = 0.5; gctx.fillStyle = '#0e1519'; gctx.beginPath(); gctx.arc(cx, cy, s*0.47, 0, TAU); gctx.fill();
+  for (const a of axes) {
+    const x = cx + a.p.x*R, y = cy - a.p.y*R;
+    gctx.globalAlpha = a.p.z < -0.15 ? 0.45 : 1;
+    gctx.strokeStyle = a.c; gctx.lineWidth = s*0.035; gctx.beginPath(); gctx.moveTo(cx, cy); gctx.lineTo(x, y); gctx.stroke();
+    gctx.fillStyle = a.c; gctx.beginPath(); gctx.arc(x + a.p.x*s*0.07, y - a.p.y*s*0.07, s*0.085, 0, TAU); gctx.fill();
+    gctx.fillStyle = '#0a0f12'; gctx.fillText(a.l, x + a.p.x*s*0.07, y - a.p.y*s*0.07 + 1);
+  }
+  gctx.globalAlpha = 1;
+}
+let camAnim = null, scan = {on:false, t0:0};
+function loop(t){
+  requestAnimationFrame(loop);
+  if (camAnim) {
+    const k = Math.min(1, (t - camAnim.t0) / camAnim.dur), e = k < 0.5 ? 4*k*k*k : 1 - Math.pow(-2*k + 2, 3)/2;
+    camera.position.lerpVectors(camAnim.p0, camAnim.p1, e); controls.target.lerpVectors(camAnim.t0v, camAnim.t1, e);
+    if (k >= 1) camAnim = null; needs = true;
+  }
+  if (scan.on) {
+    const dur = 10000, k = ((t - scan.t0) % dur) / dur;
+    AX.x.c = Math.round((2380 - k * 4740) / 10) * 10; syncAxis('x'); updatePlanes(); updateHud(); laserFlash = {k:'x', until:performance.now() + 200}; needs = true;
+  }
+  if (laserFlash.k && performance.now() > laserFlash.until) { laserFlash.k = null; updateHelpers(); needs = true; }
+  const moved = controls.update();
+  if (moved || needs) { renderer.render(scene, camera); drawGizmo(); needs = false; }
+}
+function resize(){
+  const r = stage.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(r.width)), h = Math.max(1, Math.floor(r.height));
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); requestRender();
+}
+new ResizeObserver(resize).observe(stage);
+controls.addEventListener('change', requestRender);
+
+/* ======================================================================
+   Picking: respects clipping, hidden systems and ghosting
+   ====================================================================== */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pick(ev){
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects(pickables.filter(m => parts.get(m.userData.partId).group.visible), false);
+  let ghostHit = null;
+  for (const h of hits) {
+    if (!insideClip(h.point)) continue;
+    const p = parts.get(h.object.userData.partId);
+    const st = partState(p);
+    if (state.mode === 'xray' || st === 'solid' || p.id === state.sel) return p.id;
+    if (!ghostHit) ghostHit = p.id;
+  }
+  return ghostHit;
+}
+const tip = $('#tip');
+let downAt = null, hoverRAF = 0, lastMove = null;
+canvas.addEventListener('pointerdown', e => { downAt = {x:e.clientX, y:e.clientY}; });
+canvas.addEventListener('pointerup', e => {
+  if (!downAt) return;
+  const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 5; downAt = null;
+  if (moved || e.button !== 0) return;
+  const id = pick(e);
+  if (id) select(id); else if (state.sel) { select(null); }
+});
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse' || e.buttons) { tip.hidden = true; return; }
+  lastMove = e;
+  if (!hoverRAF) hoverRAF = requestAnimationFrame(() => { hoverRAF = 0; doHover(lastMove); });
+});
+canvas.addEventListener('pointerleave', () => { tip.hidden = true; setHover(null); });
+canvas.addEventListener('dblclick', e => { const id = pick(e); if (id) { select(id); focusPart(id); } });
+function doHover(e){
+  const id = pick(e);
+  setHover(id);
+  if (!id) { tip.hidden = true; canvas.style.cursor = 'crosshair'; return; }
+  const p = parts.get(id), info = infoFor(id), r = stage.getBoundingClientRect();
+  tip.innerHTML = `<i style="background:#${SYS[p.sys].c.toString(16).padStart(6,'0')}"></i>${esc(info.n)}<small>${esc(info.e)}</small>`;
+  tip.hidden = false;
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  tip.style.left = Math.min(x, r.width - tip.offsetWidth - 20) + 'px'; tip.style.top = Math.min(y, r.height - 40) + 'px';
+  canvas.style.cursor = 'pointer';
+}
+function setHover(id){ if (state.hover === id) return; state.hover = id; applyLook(); highlightRow(); updateHud(); }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hex = n => '#' + n.toString(16).padStart(6, '0');
+
+/* ======================================================================
+   Selection & info card
+   ====================================================================== */
+function infoFor(id){
+  const base = INFO[id];
+  if (id === 'bevCells') {
+    const inst = parts.get('bevCells')?.meshes.find(m => m.isInstancedMesh);
+    const ci = Object.assign({}, base, CELLINFO[state.cell]);
+    ci.v = ci.v.replace('{N}', inst ? inst.count.toLocaleString('en-US') : '—');
+    return ci;
+  }
+  return base;
+}
+function select(id){
+  state.sel = id;
+  if (id) showCard(id); else hideCard();
+  applyLook(); highlightRow();
+}
+function showCard(id, quiet){
+  const p = parts.get(id), info = infoFor(id), card = $('#card');
+  $('#cSys i').style.background = hex(SYS[p.sys].c);
+  $('#cSys span').textContent = SYS[p.sys].n;
+  $('#cName').textContent = info.n;
+  $('#cEn').textContent = info.e;
+  const ts = info.t || ALL;
+  $('#cTypes').innerHTML = ALL.map(t => `<span class="${ts.includes(t) ? 'on' : ''}" title="${ts.includes(t) ? '搭載' : '非搭載'}">${TYPES[t].label}</span>`).join('');
+  let h = `<div><dt>役割</dt><dd>${esc(info.r)}</dd></div>`;
+  if (info.h) h += `<div><dt>しくみ・ポイント</dt><dd>${esc(info.h)}</dd></div>`;
+  if (info.v) h += `<div><dt>代表的な値</dt><dd class="val">${esc(info.v)}</dd></div>`;
+  h += `<div><dt>代表メーカー</dt><dd class="makers">${info.m.map(x => `<span>${esc(x)}</span>`).join('')}</dd></div>`;
+  $('#cBody').innerHTML = h;
+  $('#cIso').setAttribute('aria-pressed', String(state.isolate));
+  card.hidden = false; card.scrollTop = 0;
+  $('#hint').hidden = true;
+  void quiet;
+}
+function hideCard(){ $('#card').hidden = true; }
+$('#cClose').addEventListener('click', () => select(null));
+$('#cFocus').addEventListener('click', () => state.sel && focusPart(state.sel, true));
+$('#cIso').addEventListener('click', () => setIsolate(!state.isolate));
+addEventListener('keydown', e => { if (e.key === 'Escape' && state.sel) select(null); });
+
+/* ======================================================================
+   Camera views
+   ====================================================================== */
+function flyTo(pos, target, dur = 700){
+  if (reduceMotion) { camera.position.copy(pos); controls.target.copy(target); requestRender(); return; }
+  camAnim = {p0:camera.position.clone(), p1:pos, t0v:controls.target.clone(), t1:target, t0:performance.now(), dur};
+}
+function fitDist(base){ return base * Math.max(1, 1.35 / camera.aspect); }
+function view(name){
+  const t = V(0, 0.55, 0), dirs = {iso:V(1, 0.5, -1.05), front:V(1, 0.08, 0), rear:V(-1, 0.08, 0), side:V(0, 0.06, 1), left:V(0, 0.06, -1), top:V(0, 1, 0.002), bottom:V(0, -1, 0.002)};
+  const d = dirs[name].clone().normalize(), dist = fitDist(name === 'front' || name === 'rear' ? 6.0 : name === 'iso' ? 7.6 : 9.4);
+  flyTo(t.clone().addScaledVector(d, dist), t);
+}
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => view(b.dataset.view)));
+function setIsolate(on){ state.isolate = on; $('#isoChk').checked = on; $('#cIso').setAttribute('aria-pressed', String(on)); applyLook(); }
+function focusPart(id, isolate){
+  if (isolate) setIsolate(true);
+  const p = parts.get(id); const box = new THREE.Box3();
+  p.group.traverse(o => { if (o.isInstancedMesh) { const b = new THREE.Box3(), m = new THREE.Matrix4(); o.geometry.computeBoundingBox(); for (let i = 0; i < o.count; i += Math.max(1, Math.floor(o.count / 60))) { o.getMatrixAt(i, m); b.copy(o.geometry.boundingBox).applyMatrix4(m).applyMatrix4(o.matrixWorld); box.union(b); } } else if (o.isMesh) box.expandByObject(o); });
+  if (box.isEmpty()) return;
+  const c = box.getCenter(V()), size = box.getSize(V()).length();
+  // look from outside the car toward the part, leaning toward the current view direction
+  const out = c.clone().sub(V(0, 0.6, 0)); out.y = 0; if (out.lengthSq() < 0.01) out.set(1, 0, 0);
+  const dir = out.normalize().add(camera.position.clone().sub(controls.target).normalize()).normalize();
+  dir.y = Math.max(dir.y, 0.45); dir.normalize();
+  flyTo(c.clone().addScaledVector(dir, Math.max(1.4, size * 2.2) * Math.max(1, 1.1 / camera.aspect)), c);
+}
+
+/* ======================================================================
+   UI: axes
+   ====================================================================== */
+const fmt = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toLocaleString('en-US');
+function axisMarkup(k){
+  const a = AX[k];
+  return `<div class="axis" style="--c:var(--ax-${k})" data-axis="${k}">
+    <div class="axis-h"><span class="badge">${k.toUpperCase()}</span><span>${a.name}</span><span class="pl">${a.plane}</span><output id="${k}Out"></output></div>
+    <div class="dual" id="${k}Dual"><div class="track"></div><div class="fill" id="${k}Fill"></div>
+      <input type="range" id="${k}Lo" min="${a.min}" max="${a.max}" step="10" value="${a.lo}" aria-label="${k.toUpperCase()}軸 手前側の切断位置（mm）">
+      <input type="range" id="${k}Hi" min="${a.min}" max="${a.max}" step="10" value="${a.hi}" aria-label="${k.toUpperCase()}軸 奥側の切断位置（mm）">
+      <input type="range" id="${k}C" min="${a.min}" max="${a.max}" step="10" value="${a.c}" aria-label="${k.toUpperCase()}軸 スラブの中心（mm）" hidden>
+    </div>
+    <div class="axis-f"><label><input type="checkbox" id="${k}Slab">スラブ（薄切り）</label>
+      <select id="${k}Th" aria-label="スラブの厚さ" disabled>${[20,50,100,200,400].map(v => `<option value="${v}"${v === a.th ? ' selected' : ''}>${v} mm</option>`).join('')}</select>
+      <button class="rst" id="${k}Rst">リセット</button></div>
+  </div>`;
+}
+$('#axes').innerHTML = ['x','y','z'].map(axisMarkup).join('');
+function syncAxis(k){
+  const a = AX[k], lo = $(`#${k}Lo`), hi = $(`#${k}Hi`), c = $(`#${k}C`), fill = $(`#${k}Fill`);
+  lo.value = a.lo; hi.value = a.hi; c.value = a.c;
+  $(`#${k}Slab`).checked = a.slab; $(`#${k}Th`).disabled = !a.slab; $(`#${k}Th`).value = a.th;
+  lo.hidden = hi.hidden = a.slab; c.hidden = !a.slab;
+  const r = axRange(k), span = a.max - a.min;
+  const p0 = Math.max(0, (r[0] - a.min) / span), p1 = Math.min(1, (r[1] - a.min) / span);
+  fill.style.left = `calc(7px + (100% - 14px) * ${p0})`; fill.style.width = `calc((100% - 14px) * ${Math.max(0.004, p1 - p0)})`;
+  $(`#${k}Out`).textContent = a.slab ? `中心 ${fmt(a.c)}・厚 ${a.th} mm` : `${fmt(r[0])} 〜 ${fmt(r[1])} mm`;
+}
+for (const k of ['x','y','z']) {
+  const a = AX[k];
+  const onChange = () => { updatePlanes(); syncAxis(k); laserFlash = {k, until:performance.now() + 1200}; updateHelpers(); updateHud(); requestRender(); };
+  $(`#${k}Lo`).addEventListener('input', e => { a.lo = Math.min(+e.target.value, a.hi - 20); onChange(); });
+  $(`#${k}Hi`).addEventListener('input', e => { a.hi = Math.max(+e.target.value, a.lo + 20); onChange(); });
+  $(`#${k}C`).addEventListener('input', e => { if (k === 'x' && scan.on) stopScan(); a.c = +e.target.value; onChange(); });
+  $(`#${k}Slab`).addEventListener('change', e => { a.slab = e.target.checked; if (a.slab) a.c = Math.round(((a.lo + a.hi) / 2) / 10) * 10; if (!a.slab && k === 'x') stopScan(); onChange(); });
+  $(`#${k}Th`).addEventListener('change', e => { a.th = +e.target.value; onChange(); });
+  $(`#${k}Rst`).addEventListener('click', () => { if (k === 'x') stopScan(); a.lo = a.min; a.hi = a.max; a.slab = false; onChange(); });
+  syncAxis(k);
+}
+function setAxes(cfg){
+  for (const k of ['x','y','z']) { const a = AX[k]; Object.assign(a, {lo:a.min, hi:a.max, slab:false}, cfg[k] || {}); syncAxis(k); }
+  updatePlanes(); updateHud(); requestRender();
+}
+const PRESETS = {
+  all:{cfg:{}, view:'iso'},
+  mid:{cfg:{y:{hi:0}}, view:'left'},
+  motor:{cfg:() => ({y:{hi:state.type === 'bev' ? 150 : 230}}), view:'left'},
+  floor:{cfg:{z:{hi:250}}, view:'top'},
+  front:{cfg:{x:{hi:1600}}, view:'front'},
+  rear:{cfg:{x:{lo:Math.round(RA*1000) + 160}}, view:'rear'},
+  slab:{cfg:{x:{slab:true, c:-200, th:100}}, view:'iso'},
+};
+document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => { stopScan(); const p = PRESETS[b.dataset.preset]; setAxes(typeof p.cfg === 'function' ? p.cfg() : p.cfg); view(p.view); }));
+function stopScan(){ if (!scan.on) return; scan.on = false; $('#scanBtn').textContent = '▶ X軸スキャン'; $('#scanBtn').setAttribute('aria-pressed', 'false'); }
+$('#scanBtn').addEventListener('click', () => {
+  if (scan.on) { stopScan(); return; }
+  AX.x.slab = true; AX.x.th = 60; scan.on = true; scan.t0 = performance.now();
+  $('#scanBtn').textContent = '■ スキャン停止'; $('#scanBtn').setAttribute('aria-pressed', 'true'); syncAxis('x');
+});
+
+/* ======================================================================
+   UI: type, display, systems, list
+   ====================================================================== */
+function radios(sel, attr, cb){
+  const wrap = $(sel);
+  wrap.addEventListener('click', e => { const b = e.target.closest('button[role=radio]'); if (!b) return; wrap.querySelectorAll('button').forEach(x => x.setAttribute('aria-checked', String(x === b))); cb(b.dataset[attr]); });
+}
+radios('#typeSeg', 'type', v => { state.type = v; stopScan(); build(); renderType(); });
+radios('#modeSeg', 'mode', v => { state.mode = v; applyLook(); updateHud(); });
+radios('#colorSeg', 'color', v => { state.color = v; applyLook(); updateHud(); });
+radios('#cellSeg', 'cell', v => { state.cell = v; build(); });
+$('#ghost').addEventListener('input', e => { state.ghost = +e.target.value / 100; $('#ghostOut').textContent = e.target.value + '%'; applyLook(); });
+$('#explode').addEventListener('input', e => { state.explode = +e.target.value / 100; $('#explodeOut').textContent = e.target.value + '%'; applyExplode(); });
+$('#isoChk').addEventListener('change', e => setIsolate(e.target.checked));
+function renderType(){
+  const t = TYPES[state.type];
+  $('#tDesc').textContent = t.desc;
+  $('#tSpecs').innerHTML = t.specs.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+  $('#tEx').textContent = t.ex;
+  $('#cellRow').hidden = state.type !== 'bev';
+}
+const SYS_STATES = [['solid','表示'],['ghost','透過'],['hidden','隠す']];
+function buildLists(){
+  const counts = {};
+  for (const p of parts.values()) counts[p.sys] = (counts[p.sys] || 0) + 1;
+  $('#sysList').innerHTML = SYS_ORDER.filter(k => counts[k]).map(k => `<li data-sys="${k}" class="${state.sys[k] === 'hidden' ? 'off' : ''}">
+    <span class="sw" style="background:${hex(SYS[k].c)}"></span><span class="nm">${SYS[k].n}<small>${counts[k]}</small></span>
+    <span class="tri" role="radiogroup" aria-label="${SYS[k].n}の表示">${SYS_STATES.map(([v, l]) => `<button role="radio" data-v="${v}" aria-checked="${state.sys[k] === v}">${l}</button>`).join('')}</span></li>`).join('');
+  renderPartList();
+}
+$('#sysList').addEventListener('click', e => {
+  const b = e.target.closest('button[data-v]'); if (!b) return;
+  const li = b.closest('li'), k = li.dataset.sys; state.sys[k] = b.dataset.v;
+  li.querySelectorAll('button').forEach(x => x.setAttribute('aria-checked', String(x === b))); li.classList.toggle('off', b.dataset.v === 'hidden');
+  applyLook();
+});
+function renderPartList(){
+  const q = $('#q').value.trim().toLowerCase();
+  const list = [...parts.values()].map(p => ({p, info:infoFor(p.id)})).filter(({info}) => !q || [info.n, info.e, ...(info.m || [])].join(' ').toLowerCase().includes(q));
+  $('#partCount').textContent = `${parts.size}点`;
+  let h = '';
+  for (const k of SYS_ORDER) {
+    const g = list.filter(x => x.p.sys === k); if (!g.length) continue;
+    h += `<li class="grp"><i style="background:${hex(SYS[k].c)}"></i>${SYS[k].n}</li>`;
+    h += g.map(({p, info}) => `<li><button data-id="${p.id}" aria-current="${p.id === state.sel}">${esc(info.n)}<small>${esc(info.e)}</small></button></li>`).join('');
+  }
+  $('#plist').innerHTML = h || `<li class="none">「${esc(q)}」に一致する部品はありません。</li>`;
+}
+$('#q').addEventListener('input', renderPartList);
+$('#plist').addEventListener('click', e => { const b = e.target.closest('button[data-id]'); if (!b) return; const id = b.dataset.id; if (state.sys[parts.get(id).sys] === 'hidden') { state.sys[parts.get(id).sys] = 'solid'; buildLists(); } select(id); focusPart(id, true); });
+$('#plist').addEventListener('mouseover', e => { const b = e.target.closest('button[data-id]'); setHover(b ? b.dataset.id : null); });
+$('#plist').addEventListener('mouseleave', () => setHover(null));
+function highlightRow(){ document.querySelectorAll('#plist button[data-id]').forEach(b => b.setAttribute('aria-current', String(b.dataset.id === state.sel))); }
+
+/* ---------- HUD ---------- */
+function updateHud(){
+  const t = TYPES[state.type];
+  $('#hudTL').innerHTML = `<div class="big"><b>${t.label}</b> ${t.jp}</div><div>${t.layout}</div><div><span class="k">L</span> 4600 <span class="k">W</span> 1840 <span class="k">H</span> 1500 <span class="k">WB</span> 2750 mm</div><div><span class="k">PARTS</span> ${parts.size}</div>`;
+  $('#hudTR').innerHTML = ['x','y','z'].map(k => { const r = axRange(k), act = axActive(k); const on = act[0] || act[1];
+    return `<div class="row"><i style="color:${AXC[k]}">${k.toUpperCase()}</i><span style="color:${on ? 'var(--ink)' : ''}">${fmt(r[0])} … ${fmt(r[1])}</span></div>`; }).join('') + `<div class="k">mm · ISO 8855</div>`;
+  const hv = state.hover ? infoFor(state.hover).n : '';
+  $('#hudBR').innerHTML = `<div>${state.mode === 'xray' ? 'X-RAY' : 'SOLID / HATCH'}</div><div>${state.color === 'sys' ? '系統色' : '実物風'}</div>${hv ? `<div style="color:var(--ink)">▸ ${esc(hv)}</div>` : ''}`;
+}
+
+/* ---------- start ---------- */
+renderType();
+try { build(); } catch (err) { console.error(err); $('#loading').textContent = 'モデルの構築中にエラーが発生しました: ' + err.message; return; }
+setAxes({y:{hi:150}}); resize(); view('iso');
+camera.position.copy(camAnim ? camAnim.p1 : camera.position); if (camAnim) { controls.target.copy(camAnim.t1); camAnim = null; }
+$('#loading').hidden = true;
+requestAnimationFrame(loop);
+})();
+</script>
 </body>
 </html>
